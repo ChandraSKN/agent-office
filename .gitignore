@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+state/
+workspace/
+office.log
+video/*.webm
+video/*.wav
+video/*.mp4
+video/*.png

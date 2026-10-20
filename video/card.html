@@ -1,0 +1,9 @@
+<!doctype html><meta charset="utf-8"><style>
+html{background:#2a2442}body{margin:0;width:100vw;height:100vh;font-family:Inter,system-ui,sans-serif;background:linear-gradient(135deg,#1d1b2e,#3a2d5c);color:#fff;display:flex;flex-direction:column;justify-content:center;padding:0 90px;box-sizing:border-box}
+small{color:#c9a6ff;font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:18px}
+h1{font-size:54px;margin:12px 0 28px;line-height:1.1}
+li{font-size:25px;margin:10px 0;color:#e8e2f5;list-style:none}li::before{content:"▸ ";color:#c9a6ff}
+ul{padding:0;margin:0}
+</style><body><small id="tag"></small><h1 id="t"></h1><ul id="l"></ul>
+<script>const q=new URLSearchParams(location.search);tag.textContent=q.get("tag");t.textContent=q.get("t");
+for(const x of q.get("l").split("|")){const li=document.createElement("li");li.textContent=x;l.append(li)}</script>

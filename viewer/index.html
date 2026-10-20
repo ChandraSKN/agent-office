@@ -1,0 +1,944 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Office</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6e7f0; --panel: rgba(255,255,255,.86); --ink: #3b2f45; --muted: #8a7d95; --line: rgba(59,47,69,.1);
+    --ceo: #c9971c; --cto: #9b6bdf; --software: #3aa6c9; --hardware: #f08a3c; --product: #e86aa6; --operations: #2fa37a;
+    --ok: #3fb67a; --warn: #f2b632; --bad: #e5534b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+    font-family: Nunito, system-ui, sans-serif; }
+  #scene { position: fixed; inset: 0; }
+  .panel { position: fixed; background: var(--panel); backdrop-filter: blur(10px); border-radius: 18px;
+    box-shadow: 0 6px 24px rgba(80,40,90,.12); }
+  /* top stats */
+  #top { top: 12px; left: 12px; right: 12px; display: flex; gap: 8px; align-items: center; padding: 8px 12px; flex-wrap: wrap; }
+  #top h1 { font-size: 16px; margin: 0 8px 0 2px; font-weight: 800; white-space: nowrap; }
+  .stat { display: flex; align-items: baseline; gap: 5px; padding: 4px 10px; border-radius: 12px; background: rgba(255,255,255,.7); font-size: 13px; }
+  .stat b { font-size: 16px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  #top .grow { flex: 1; }
+  .toggle { border: 0; border-radius: 12px; padding: 6px 11px; background: #fff; color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .toggle[aria-pressed="false"] { opacity: .5; }
+  #live { font-size: 12px; color: var(--muted); }
+  /* log */
+  #log { top: 72px; right: 12px; bottom: 84px; width: min(380px, calc(100vw - 24px)); display: flex; flex-direction: column; padding: 12px; }
+  #log h2, #agent h2 { margin: 0 0 8px; font-size: 14px; font-weight: 800; }
+  .filters { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+  .filters button { border: 0; border-radius: 10px; padding: 3px 9px; font: inherit; font-size: 12px; background: #fff; cursor: pointer; color: var(--ink); }
+  .filters button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  #events { overflow-y: auto; flex: 1; font-size: 12.5px; }
+  .ev { display: grid; grid-template-columns: 54px 1fr; gap: 6px; padding: 5px 2px; border-bottom: 1px solid var(--line); }
+  .ev time { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ev .who { font-weight: 800; }
+  .kind { font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 6px; margin-left: 4px; background: #eee; }
+  .k-SEND { background: #e4dcfb; } .k-START { background: #d6f0fb; } .k-DONE { background: #d6f5e4; }
+  .k-ASK { background: #fdeec7; } .k-DENY { background: #fbd9d7; } .k-APPROVE { background: #d6f5e4; }
+  .k-GOAL { background: #fbd9ea; } .k-SAY { background: #ece6f5; }
+  .ev .txt { color: #5b4f66; white-space: pre-wrap; word-break: break-word; max-height: 9em; overflow: hidden; }
+  /* agent card */
+  #agent { top: 72px; left: 12px; width: min(330px, calc(100vw - 24px)); max-height: calc(100vh - 168px); overflow-y: auto; padding: 14px; display: none; }
+  #agent .role { font-size: 18px; font-weight: 800; }
+  #agent .team { display: inline-block; color: #fff; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 8px; text-transform: uppercase; }
+  #agent p { margin: 8px 0; font-size: 13px; color: #5b4f66; }
+  #agent .close { float: right; border: 0; background: none; font-size: 18px; cursor: pointer; color: var(--muted); }
+  .kv { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin: 10px 0; }
+  .kv div { background: #fff; border-radius: 10px; padding: 6px; text-align: center; font-size: 11px; color: var(--muted); }
+  .kv b { display: block; font-size: 15px; color: var(--ink); }
+  #agentEvents .ev { grid-template-columns: 1fr; }
+  /* message bar */
+  #ask { left: 12px; right: 12px; bottom: 12px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  #ask .row { display: flex; gap: 8px; }
+  .attach { display: grid; place-items: center; width: 46px; border-radius: 12px; background: #fff; font-size: 20px; cursor: pointer; }
+  #chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  #chips:empty { display: none; }
+  .chip { display: flex; align-items: center; gap: 6px; background: #fff; border-radius: 10px; padding: 4px 6px 4px 8px; font-size: 12.5px; max-width: 260px; }
+  .chip img { width: 28px; height: 28px; object-fit: cover; border-radius: 6px; }
+  .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #ask .chip button { padding: 0 2px; border: 0; background: none; cursor: pointer; color: var(--muted); font-size: 14px; }
+  #drop { position: fixed; inset: 0; display: none; place-items: center; background: rgba(155,107,223,.25);
+    border: 4px dashed var(--cto); font-size: 22px; font-weight: 800; color: var(--ink); z-index: 10; pointer-events: none; }
+  body.dragging #drop { display: grid; }
+  .k-FILE { background: #fff0c2; }
+  #ask input { flex: 1; border: 0; border-radius: 12px; padding: 12px 14px; font: inherit; font-size: 15px; background: #fff; color: var(--ink); min-width: 0; }
+  #ask button, .btn { border: 0; border-radius: 12px; padding: 0 18px; font: inherit; font-weight: 800; background: var(--cto); color: #fff; cursor: pointer; }
+  /* approval */
+  #approval { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 24px)); padding: 18px; display: none; border: 3px solid var(--warn); z-index: 5; }
+  #approval h2 { margin: 0 0 6px; font-size: 17px; }
+  #approval code { display: block; background: #fff; border-radius: 10px; padding: 10px; font-size: 13px; white-space: pre-wrap; word-break: break-all; margin: 10px 0 14px; }
+  #approval .row { display: flex; gap: 8px; justify-content: flex-end; }
+  #approval .row .btn { padding: 10px 18px; }
+  .deny { background: #fff !important; color: var(--bad) !important; border: 2px solid var(--bad) !important; }
+  .approve { background: var(--ok) !important; }
+  /* labels over the 3D scene */
+  #labels { position: fixed; inset: 0; pointer-events: none; }
+  .label { position: absolute; transform: translate(-50%, -100%); text-align: center; white-space: nowrap; }
+  .name { font-size: 11px; font-weight: 800; background: rgba(255,255,255,.9); padding: 2px 7px; border-radius: 8px; border-bottom: 3px solid; }
+  .bubble { display: block; margin: 0 auto 4px; max-width: 190px; white-space: normal; font-size: 11px; background: #fff; padding: 5px 8px; border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.12); line-height: 1.25; }
+  .bubble.waiting { background: #fff3cd; font-weight: 800; }
+  body.no-names .name, body.no-bubbles .bubble { display: none; }
+  body.no-log #log { display: none; }
+  #empty { position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%); font-size: 13px; color: var(--muted); }
+  /* story mode (?story): captions, clock, stress bars */
+  .mood { display: none; width: 64px; height: 6px; margin: 3px auto 0; border-radius: 4px; background: rgba(255,255,255,.8); overflow: hidden; }
+  .mood i { display: block; height: 100%; width: 10%; background: var(--ok); transition: width .8s, background .8s; }
+  body.story .mood { display: block; }
+  body.story #ask, body.story #empty { display: none; }
+  #caption { display: none; position: fixed; left: 24px; bottom: 24px; width: min(620px, calc(100vw - 430px)); padding: 16px 20px; border-left: 6px solid var(--cto); }
+  body.story #caption { display: block; }
+  #caption small { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--cto); }
+  #caption h2 { margin: 2px 0 4px; font-size: 26px; font-weight: 800; }
+  #caption p { margin: 0; font-size: 15px; color: #5b4f66; }
+  #caption .lesson { display: none; margin-top: 10px; padding: 8px 12px; border-radius: 10px; background: #e6f6ec; font-weight: 700; font-size: 14px; }
+  #caption .lesson:not(:empty) { display: block; }
+  #caption .lesson::before { content: "💡 Lesson: "; color: var(--ok); }
+  #caption ul { margin: 6px 0 0; padding-left: 20px; font-size: 15px; line-height: 1.5; }
+  .bubble.angry { background: #fbd9d7; font-weight: 800; }
+  @media (max-width: 760px) { #log { top: auto; height: 34vh; bottom: 84px; } #agent { max-height: 40vh; } }
+</style>
+</head>
+<body>
+<div id="scene"></div>
+<div id="labels"></div>
+
+<div id="top" class="panel">
+  <h1>🏢 Agent Office</h1>
+  <span class="stat"><b id="sAgents">19</b> agents</span>
+  <span class="stat"><span class="dot" style="background:var(--ok)"></span><b id="sWorking">0</b> working</span>
+  <span class="stat"><span class="dot" style="background:var(--warn)"></span><b id="sWaiting">0</b> waiting</span>
+  <span class="stat"><b id="sDone">0</b> tasks done</span>
+  <span class="stat"><b id="sQueued">0</b> queued</span>
+  <span class="grow"></span>
+  <span id="live">connecting…</span>
+  <a class="toggle" href="?story" style="text-decoration:none">▶ Story</a>
+  <button class="toggle" data-cls="no-names" aria-pressed="true">Names</button>
+  <button class="toggle" data-cls="no-bubbles" aria-pressed="true">Bubbles</button>
+  <button class="toggle" data-cls="no-log" aria-pressed="true">Log</button>
+</div>
+
+<div id="log" class="panel">
+  <h2>Execution log</h2>
+  <div class="filters" id="filters">
+    <button data-f="all" aria-pressed="true">All</button>
+    <button data-f="cto">Leadership</button>
+    <button data-f="software">Software</button>
+    <button data-f="hardware">Hardware</button>
+    <button data-f="product">Product</button>
+    <button data-f="operations">Ops</button>
+    <button data-f="steps">+ steps</button>
+  </div>
+  <div id="events"></div>
+</div>
+
+<div id="agent" class="panel" role="dialog" aria-label="Agent details">
+  <button class="close" aria-label="Close" id="closeAgent">✕</button>
+  <div class="role" id="aRole"></div>
+  <span class="team" id="aTeam"></span>
+  <p id="aDesc"></p>
+  <div class="kv"><div>status<b id="aStatus"></b></div><div>tasks done<b id="aDone"></b></div><div>team<b id="aTeam2"></b></div></div>
+  <p id="aTask"></p>
+  <h2>Recent activity</h2>
+  <div id="agentEvents"></div>
+</div>
+
+<form id="ask" class="panel">
+  <div id="chips"></div>
+  <div class="row">
+    <label class="attach" title="Attach PDFs or images">📎<input id="files" type="file" multiple
+      accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.csv" hidden></label>
+    <input id="msg" autocomplete="off" placeholder="Share an idea with CEO Buddy… attach PDFs or images with 📎" aria-label="Message">
+    <button type="submit" id="sendBtn">Send</button>
+  </div>
+</form>
+<div id="drop">Drop PDFs or images to share them with CEO Buddy</div>
+
+<div id="approval" class="panel" role="alertdialog" aria-labelledby="apTitle">
+  <h2 id="apTitle">⚠️ Approval needed</h2>
+  <div id="apWho"></div>
+  <code id="apWhat"></code>
+  <div class="row"><button class="btn deny" id="apNo">Deny</button><button class="btn approve" id="apYes">Approve</button></div>
+</div>
+<div id="empty"></div>
+<div id="caption" class="panel"><small id="capTag"></small><h2 id="capTitle"></h2><p id="capText"></p><div class="lesson" id="capLesson"></div></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const TEAM = { ceo: 0xd4a72c, cto: 0x9b6bdf, software: 0x3aa6c9, hardware: 0xf08a3c, product: 0xe86aa6, operations: 0x2fa37a };
+const TEAM_CSS = Object.fromEntries(Object.keys(TEAM).map(t => [t, `var(--${t})`]));
+const $ = (id) => document.getElementById(id);
+
+// ── scene: an office building on a campus, seen from above with the roof off ──
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+$("scene").appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 400);
+camera.position.set(0, 38, 40);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.maxPolarAngle = 1.32; controls.minDistance = 12; controls.maxDistance = 120;
+controls.target.set(0, 0, 3);
+
+// day, evening or night from your clock
+const hour = new Date().getHours();
+const NIGHT = hour < 6 || hour >= 19, EVENING = !NIGHT && hour >= 17;
+const SKY = NIGHT ? 0x1b2340 : EVENING ? 0xf3c9a8 : 0xcfe8f7;
+scene.background = new THREE.Color(SKY);
+scene.fog = new THREE.Fog(SKY, 110, 220);
+const hemi = new THREE.HemisphereLight(NIGHT ? 0x6f7fb0 : 0xffffff, NIGHT ? 0x20263a : 0xb7c9a8, NIGHT ? .55 : 1.5);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(NIGHT ? 0x9fb2ff : EVENING ? 0xffc48a : 0xffffff, NIGHT ? .35 : 1.7);
+sun.position.set(30, 50, 25); sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, { left: -48, right: 48, top: 48, bottom: -48 });
+scene.add(sun);
+
+const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: .8, ...o });
+const glass = new THREE.MeshStandardMaterial({ color: 0xbfe3f2, transparent: true, opacity: .22, roughness: .1, metalness: .2 });
+const box = (w, h, d, m, x, y, z, parent = scene) => {
+  const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof m === "number" ? mat(m) : m);
+  b.position.set(x, y, z); b.castShadow = b.receiveShadow = true; parent.add(b); return b;
+};
+const rand = (s => () => (s = (s * 16807) % 2147483647) / 2147483647)(7);
+function signTexture(text, bg, fg, w = 512, h = 128) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"); g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  g.fillStyle = fg; g.font = `800 ${h * .45}px Nunito, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(text, w / 2, h / 2);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+// grounds: lawn, road, parking lot, paths
+const lawn = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), mat(NIGHT ? 0x2f4a32 : 0x8cc56f));
+lawn.rotation.x = -Math.PI / 2; lawn.position.y = -.02; lawn.receiveShadow = true; scene.add(lawn);
+box(160, .04, 9, 0x4a4d55, 0, 0, 40);                                   // road
+for (let x = -76; x < 80; x += 8) box(4, .05, .3, 0xf4f0d8, x, .01, 40); // centre line
+box(56, .05, 16, 0x5b5e66, 0, 0, 25);                                   // parking lot
+box(6, .05, 4, 0x5b5e66, 0, 0, 34.5);                                   // driveway
+box(5, .06, 4.2, 0xd8cfbf, 0, 0, 15.2);                                 // path to the door
+for (let x = -26; x <= 26; x += 3.2) {                                   // bay lines, two rows
+  box(.12, .06, 5, 0xf2f2f2, x, .01, 20.2); box(.12, .06, 5, 0xf2f2f2, x, .01, 29.8);
+}
+const CAR_COLORS = [0xd94b4b, 0x3f6fd8, 0xf2f2f2, 0x2b2b30, 0xb8bcc4, 0xf0b23a, 0x3aa37a, 0x8a4fd1];
+function car(x, z, facing) {
+  const g = new THREE.Group(), c = CAR_COLORS[Math.floor(rand() * CAR_COLORS.length)];
+  box(1.9, .7, 4, c, 0, .6, 0, g);
+  box(1.6, .6, 2.1, glass, 0, 1.2, -.2, g).material = mat(0x26303d, { roughness: .2, metalness: .4 });
+  for (const [wx, wz] of [[-.95, 1.3], [.95, 1.3], [-.95, -1.3], [.95, -1.3]]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(.38, .38, .3, 14), mat(0x1c1c1c));
+    w.rotation.z = Math.PI / 2; w.position.set(wx, .38, wz); g.add(w);
+  }
+  g.position.set(x, 0, z); g.rotation.y = facing; scene.add(g);
+}
+for (let x = -24.4; x <= 24.4; x += 3.2) {
+  if (rand() < .72) car(x, 20.2, 0);
+  if (rand() < .6) car(x, 29.8, Math.PI);
+}
+// lamp posts around the lot
+for (const [x, z] of [[-28, 18], [28, 18], [-28, 32], [28, 32], [-10, 33], [10, 33]]) {
+  box(.18, 5, .18, 0x3a3d44, x, 2.5, z);
+  box(1.2, .18, .5, 0x3a3d44, x, 5, z);
+  const bulb = box(.7, .12, .35, mat(0xffffff, { emissive: 0xffe2a0, emissiveIntensity: NIGHT ? 2 : 0 }), x, 4.88, z);
+  bulb.castShadow = false;
+  if (NIGHT) { const l = new THREE.PointLight(0xffd99a, 40, 18); l.position.set(x, 4.6, z); scene.add(l); }
+}
+// trees around the campus
+for (let i = 0; i < 70; i++) {
+  const a = rand() * Math.PI * 2, r = 42 + rand() * 30;
+  const x = Math.cos(a) * r, z = Math.sin(a) * r * .8 - 4;
+  if (z > 34 && z < 46) continue;                                       // keep the road clear
+  const g = new THREE.Group(), s = .8 + rand() * .7;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.2 * s, .28 * s, 1.6 * s), mat(0x8a5a3c)); trunk.position.y = .8 * s;
+  const top = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 * s, 1), mat(NIGHT ? 0x2e5a34 : [0x4f9a4e, 0x5fae58, 0x478c46][i % 3], { flatShading: true }));
+  top.position.y = 2.4 * s; trunk.castShadow = top.castShadow = true;
+  g.add(trunk, top); g.position.set(x, 0, z); scene.add(g);
+}
+// hedges along the front of the building
+for (const x of [-15, -8, 8, 15]) box(5, .9, 1.2, 0x4e9150, x, .45, 15.4);
+// monument sign by the path
+const sign = box(7, 1.6, .5, 0xe9e4da, -6.5, .8, 17.6);
+const face = new THREE.Mesh(new THREE.PlaneGeometry(6.6, 1.3), new THREE.MeshBasicMaterial({ map: signTexture("AGENT OFFICE", "#2f2a3a", "#ffffff") }));
+face.position.set(-6.5, .85, 17.86); scene.add(face);
+
+// the building: floor, low walls, glass, pillars, no roof
+const W = 48, D = 28;                                                    // x from -24..24, z from -14..14
+box(W + 1, .3, D + 1, 0x9a948a, 0, .15, 0);                             // slab
+const floor = box(W, .04, D, 0xe7dccb, 0, .32, 0); floor.castShadow = false;
+const wallM = mat(0xf3efe8);
+box(W, 3.4, .4, wallM, 0, 2, -D / 2);                                   // back wall (solid)
+box(.4, 3.4, D, wallM, -W / 2, 2, 0); box(.4, 3.4, D, wallM, W / 2, 2, 0);
+box(W / 2 - 3, .9, .4, wallM, -(W / 4 + 1.5), .75, D / 2);              // front: low wall + glass, door gap
+box(W / 2 - 3, .9, .4, wallM, W / 4 + 1.5, .75, D / 2);
+box(W / 2 - 3, 2.5, .08, glass, -(W / 4 + 1.5), 2.45, D / 2);
+box(W / 2 - 3, 2.5, .08, glass, W / 4 + 1.5, 2.45, D / 2);
+for (let x = -W / 2; x <= W / 2; x += 7) box(.6, 3.6, .6, 0xd9d3c9, x, 2.1, D / 2);
+for (let x = -W / 2 + 7; x < W / 2; x += 7) box(.6, 3.6, .6, 0xd9d3c9, x, 2.1, -D / 2);
+
+// zones: floor tints and labels painted on the floor
+function zone(x, z, w, d, color, label) {
+  const p = box(w, .02, d, mat(color, { roughness: .9 }), x, .35, z); p.castShadow = false;
+  if (label) {
+    const l = new THREE.Mesh(new THREE.PlaneGeometry(w * .55, w * .55 / 4), new THREE.MeshBasicMaterial({ map: signTexture(label, "rgba(0,0,0,0)", "rgba(60,50,70,.55)"), transparent: true }));
+    l.rotation.x = -Math.PI / 2; l.position.set(x, .37, z + d / 2 - 1); scene.add(l);
+  }
+}
+zone(-14, -3, 19, 18, 0xdbe9f0, "SOFTWARE");
+zone(14, -3, 19, 18, 0xf3e3d4, "HARDWARE LAB");
+// CTO's glass cabin, back centre, between engineering
+zone(0, -9.5, 8, 8, 0xe9e0f5, "CTO");
+zone(-17.5, 9.6, 10, 4.6, 0xf7e1ec, "PRODUCT");
+zone(7.7, 9.6, 7.6, 4.6, 0xdcf1e7, "OPERATIONS");
+box(3.2, 3, .08, glass, -2.4, 1.85, -5.5); box(3.2, 3, .08, glass, 2.4, 1.85, -5.5);  // door gap box(.08, 3, 8, glass, -4, 1.85, -9.5); box(.08, 3, 8, glass, 4, 1.85, -9.5);
+// meeting room, front right
+box(12, .02, 6, 0xe8eef7, 17.5, .35, 9.8).castShadow = false;
+box(12, 3, .08, glass, 17.5, 1.85, 6.8); box(.08, 3, 6, glass, 11.5, 1.85, 9.8);
+box(6, .12, 2, 0x8a6a4f, 17.5, 1.1, 10); box(.3, .7, .3, 0x5a4636, 17.5, .7, 10);
+for (const dx of [-2.4, -.8, .8, 2.4]) for (const dz of [-1.6, 1.6]) box(.6, .6, .6, 0x4a5568, 17.5 + dx, .65, 10 + dz);
+// Buddy's CEO cabin: centre, between the teams, nearest the entrance
+zone(0, 2.5, 8, 7, 0xf5ecd2, "CEO");
+box(8, 3, .08, glass, 0, 1.85, 6); box(.08, 3, 7, glass, -4, 1.85, 2.5); box(.08, 3, 7, glass, 4, 1.85, 2.5);
+const rug = box(4.5, .03, 3.2, 0x8c2f39, 0, .37, 3.6); rug.castShadow = false;
+box(2.2, .9, .8, 0x6d4c3d, 2.6, .8, 4.6); box(2.2, .5, .25, 0x6d4c3d, 2.6, 1.3, 5);   // sofa
+const award = box(.35, .6, .35, mat(0xe8c252, { metalness: .8, roughness: .25 }), -3.2, 1.6, 0); award.castShadow = false;
+box(.8, 1.2, .8, 0x6e4b34, -3.2, .9, 0);
+// reception, front centre
+box(5, 1.1, 1, 0xf7f3ee, 0, .9, 10.6); box(5, .1, 1.3, 0x8a6a4f, 0, 1.5, 10.6);
+box(.9, .5, .4, 0x2a2a2e, 1.4, 1.8, 10.6);
+for (const x of [-3.2, 3.2]) { box(.8, 1.2, .8, 0x6e4b34, x, .9, 12.2); const p = new THREE.Mesh(new THREE.IcosahedronGeometry(.8, 1), mat(0x4f9a4e, { flatShading: true })); p.position.set(x, 2, 12.2); scene.add(p); }
+// pantry, front left
+box(6, 1, 1, 0xf2f2f2, -8, .85, 12.8); box(6, .1, 1.1, 0x3c3c3c, -8, 1.4, 12.8);
+box(1.1, 2.4, 1, 0xdfe4ea, -11.6, 1.55, 12.8); box(.5, .4, .4, 0x8b1e1e, -6.5, 1.65, 12.8);
+box(2.4, .1, 2.4, 0xb9905f, -8, 1.05, 9.8); box(.2, .7, .2, 0x7a5a40, -8, .7, 9.8);
+// product & research row with the library, left front; operations (stores) desk by the hardware lab
+for (let i = 0; i < 3; i++) {
+  const shelf = box(3, 2.6, .6, 0x8a6a4f, -21.8 + i * 3.1, 1.65, 13.3);
+  for (let r = 0; r < 3; r++) for (let b = 0; b < 7; b++)
+    box(.3, .55, .45, [0xc0392b, 0x2e86c1, 0x27ae60, 0xf1c40f, 0x8e44ad][(b + r + i) % 5], -23 + i * 3.1 + b * .38, .75 + r * .8, 13.15);
+}
+// interior lights at night
+const roomLights = [[-14, -6], [-14, 4], [14, -6], [14, 4], [0, -9], [0, 8]].map(([x, z]) => {
+  const l = new THREE.PointLight(0xfff1d6, 30, 16); l.position.set(x, 3.5, z); l.visible = NIGHT; scene.add(l); return l;
+});
+
+// ── desks & people ──
+const agents = {};      // name -> {g, body, ring, screen, el, bubble, team, phase}
+let roster = {}, board = {}, events = [];
+
+function layout(names) {
+  const by = { ceo: [], cto: [], software: [], hardware: [], product: [], operations: [] };
+  names.forEach(n => by[roster[n].team].push(n));
+  const grid = (xs, zs) => zs.flatMap(z => xs.map(x => new THREE.Vector3(x, 0, z)));
+  const sw = grid([-20.5, -14, -7.5], [-9, -3, 3]);
+  const hw = grid([7.5, 14, 20.5], [-9, -3, 3]);
+  const pos = {};
+  by.cto.forEach(n => pos[n] = new THREE.Vector3(0, 0, -10));
+  by.ceo.forEach(n => pos[n] = new THREE.Vector3(0, 0, 2));
+  by.software.forEach((n, i) => pos[n] = sw[i]);
+  by.hardware.forEach((n, i) => pos[n] = hw[i]);
+  by.product.forEach((n, i) => pos[n] = new THREE.Vector3(-20 + i * 5, 0, 9.5));
+  by.operations.forEach((n, i) => pos[n] = new THREE.Vector3(5.6 + i * 4.4, 0, 9.5));
+  // the spare hardware spot holds the lab's 3D printer
+  if (by.hardware.length < hw.length) {
+    const p = hw[by.hardware.length];
+    box(1.6, .8, 1.6, 0xeeeeee, p.x, .75, p.z); box(1.4, 1.2, 1.4, glass, p.x, 1.75, p.z);
+    box(.5, .5, .5, 0xf08a3c, p.x, 1.4, p.z);
+  }
+  return pos;
+}
+
+const SKIN = [0xf1c8a5, 0xd9a47a, 0xb97d55, 0x8d5a3b], HAIR = [0x2b1d16, 0x3b2a20, 0x111111, 0x5a3b26];
+function person(color, i) {
+  const g = new THREE.Group();
+  const legs = new THREE.Mesh(new THREE.BoxGeometry(.7, .35, .9), mat(0x2f3440)); legs.position.set(0, .75, -.25);
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(.34, .55, 6, 12), mat(color)); torso.position.y = 1.35;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.3, 16, 14), mat(SKIN[i % 4])); head.position.y = 2.05;
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(.315, 16, 10, 0, Math.PI * 2, 0, Math.PI * .55), mat(HAIR[i % 4]));
+  hair.position.y = 2.08; hair.rotation.x = .25;
+  for (const m of [legs, torso, head, hair]) { m.castShadow = true; g.add(m); }
+  return g;
+}
+
+function buddyPerson() {
+  const g = new THREE.Group(), suit = 0x1f2433, skin = 0xd9a47a, hairC = 0x141414;
+  const legs = new THREE.Mesh(new THREE.BoxGeometry(.75, .35, .9), mat(suit)); legs.position.set(0, .75, -.25);
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(.4, .6, 6, 12), mat(suit)); torso.position.y = 1.38;
+  const shirt = new THREE.Mesh(new THREE.BoxGeometry(.28, .5, .05), mat(0xffffff)); shirt.position.set(0, 1.55, -.38);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.31, 16, 14), mat(skin)); head.position.y = 2.12;
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(.33, 16, 10, 0, Math.PI * 2, 0, Math.PI * .5), mat(hairC));
+  hair.position.set(.03, 2.16, .02); hair.rotation.set(.3, 0, -.2);
+  const beard = new THREE.Mesh(new THREE.SphereGeometry(.23, 14, 10), mat(0x2a1c14));
+  beard.scale.set(1.15, .7, .75); beard.position.set(0, 1.95, -.16);  // short full beard on the chin and jaw
+  const stache = new THREE.Mesh(new THREE.BoxGeometry(.24, .05, .06), mat(0x1a120d)); stache.position.set(0, 2.05, -.3);
+  for (const m of [legs, torso, shirt, head, hair, beard, stache]) { m.castShadow = true; g.add(m); }
+  g.userData.sit = legs;
+  g.userData.stand = [-.18, .18].map(x => {          // hip pivots, so the legs can swing
+    const hip = new THREE.Group(); hip.position.set(x, 1, 0); hip.visible = false;
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(.24, 1, .26), mat(suit)); leg.position.y = -.5; leg.castShadow = true;
+    const shoe = new THREE.Mesh(new THREE.BoxGeometry(.26, .12, .4), mat(0x111111)); shoe.position.set(0, -.98, -.06);
+    hip.add(leg, shoe); g.add(hip); return hip;
+  });
+  return g;
+}
+
+function buildAgent(name, p, i) {
+  const team = roster[name].team, color = TEAM[team], isCEO = team === "ceo", isBoss = team === "cto" || isCEO,
+        lab = team === "hardware";
+  const g = new THREE.Group(); g.position.copy(p);
+  // desk (or lab bench) in front of the person, who faces the back wall (-z)
+  const top = isCEO ? 0x3b2418 : isBoss ? 0x5a3e2b : lab ? 0x9aa3ad : 0xc89f74;
+  box(isBoss ? 3 : 2.4, .12, isBoss ? 1.4 : 1.2, top, 0, 1.05, -.9, g);
+  for (const dx of [-1, 1]) box(.1, .95, 1, lab ? 0x6b7480 : 0x7a5a40, dx * (isBoss ? 1.35 : 1.1), .55, -.9, g);
+  let screen;
+  if (lab) {   // oscilloscope, PCB, soldering station
+    box(.9, .6, .5, 0x2e3a48, -.5, 1.42, -1.2, g);
+    screen = box(.6, .38, .02, mat(0x0b1a10, { emissive: 0x000000 }), -.5, 1.45, -.94, g);
+    box(.7, .04, .5, 0x1f7a3a, .45, 1.13, -.85, g);
+    box(.25, .2, .25, 0xc0392b, .95, 1.21, -1.2, g);
+  } else {     // monitor(s) and keyboard
+    box(.08, .5, .08, 0x333333, 0, 1.36, -1.25, g);
+    screen = box(isBoss ? 1.5 : 1.1, .65, .06, mat(0x15181f, { emissive: 0x000000 }), 0, 1.75, -1.25, g);
+    box(.8, .04, .28, 0xe8e8e8, 0, 1.13, -.65, g);
+    if (isBoss) box(.5, .3, .02, 0xffffff, .9, 1.25, -.7, g);   // papers
+  }
+  // chair
+  box(.8, .1, .8, 0x2d2f36, 0, .62, .15, g); box(.8, .9, .1, 0x2d2f36, 0, 1.1, .55, g);
+  box(.1, .55, .1, 0x555555, 0, .32, .15, g);
+  const body = isCEO ? buddyPerson() : person(color, i); body.position.set(0, 0, .1); g.add(body);
+  if (isCEO) {   // nameplate on the desk
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.4, .35), new THREE.MeshBasicMaterial({ map: signTexture("CEO · BUDDY", "#2a1d12", "#e8c252", 512, 128) }));
+    plate.position.set(0, 1.3, -1.62); plate.rotation.y = Math.PI; g.add(plate);
+    box(1.5, .3, .1, 0x2a1d12, 0, 1.25, -1.58, g);
+  }
+  if (isBoss) body.scale.setScalar(1.08);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(.9, 1.15, 32), new THREE.MeshBasicMaterial({ color: 0x3fb67a, transparent: true, opacity: 0 }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(0, .38, .1); g.add(ring);
+  if (isBoss) g.rotation.y = Math.PI;   // the manager faces the office through the glass
+  g.traverse(o => o.userData.agent = name);
+  scene.add(g);
+  const el = document.createElement("div");
+  el.className = "label";
+  el.innerHTML = `<span class="bubble"></span><span class="name" style="border-color:${TEAM_CSS[team]}">${team === "ceo" ? "👔 Buddy · CEO" : team === "cto" ? "🧭 CTO" : name.endsWith("-architect") ? "★ " + name.replace("-architect", " lead") : name === "operations-manager" ? "★ operations manager" : name}</span><span class="mood"><i></i></span>`;
+  $("labels").appendChild(el);
+  agents[name] = { g, body, ring, screen, el, bubble: el.querySelector(".bubble"), stressEl: el.querySelector(".mood i"), team, phase: rand() * 6 };
+}
+
+// flying envelopes for hand-offs
+const flights = [];
+function fly(from, to, color) {
+  if (!agents[from] || !agents[to]) return;
+  const m = new THREE.Mesh(new THREE.BoxGeometry(.55, .38, .08), mat(0xffffff, { emissive: color, emissiveIntensity: .25 }));
+  scene.add(m);
+  flights.push({ m, a: agents[from].g.position.clone().setY(2.6), b: agents[to].g.position.clone().setY(2.6), t: 0 });
+}
+
+// ── state polling ──
+let seen = new Set(), first = true, filter = "all", showSteps = false, selected = null;
+const key = e => e.ts + e.agent + e.kind + e.text.slice(0, 40);
+
+async function poll() {
+  try {
+    const r = await fetch("/api/state"); const s = await r.json();
+    board = s.board; events = s.events;
+    $("live").textContent = "● live · " + s.project.split("/").slice(-2).join("/");
+    $("live").style.color = "var(--ok)";
+    update(s);
+  } catch { $("live").textContent = "office offline (run: uv run office.py)"; $("live").style.color = "var(--bad)"; }
+  setTimeout(poll, 1000);
+}
+
+function update(s) {
+  const vals = Object.values(board);
+  $("sAgents").textContent = vals.length;
+  $("sWorking").textContent = vals.filter(v => v.status === "working").length;
+  $("sWaiting").textContent = vals.filter(v => v.status === "waiting").length;
+  $("sDone").textContent = vals.reduce((a, v) => a + (v.done || 0), 0);
+  $("sQueued").textContent = s.queued;
+  for (const [n, a] of Object.entries(agents)) {
+    const b = board[n] || {};
+    a.status = b.status;
+    const text = a.say ?? (n === "buddy" && ceoTrip ? ceoTrip.say
+      : b.status === "waiting" ? "⚠️ needs your OK" : b.status === "working" ? (b.task || "working…") : "");
+    a.bubble.classList.toggle("angry", !!a.angry);
+    a.bubble.textContent = text; a.bubble.style.display = text ? "" : "none";
+    a.bubble.classList.toggle("waiting", b.status === "waiting");
+  }
+  for (const e of events) {   // animate new hand-offs
+    const k = key(e); if (seen.has(k)) continue; seen.add(k);
+    if (first) continue;
+    if (e.kind === "SEND") fly(e.agent, e.text.replace(/^→ /, "").split(":")[0], TEAM[roster[e.agent]?.team] ?? 0x9b6bdf);
+    if (e.kind === "GOAL" && (e.agent === "buddy" || e.via === "buddy")) startTrip(e.project || "the project");
+    if (e.kind === "DONE" && e.agent === "cto" && (g => g?.agent === "buddy" || g?.via === "buddy")(events.findLast(x => x.kind === "GOAL"))) {
+      fly("cto", "buddy", TEAM.ceo);
+      if (deskFolder) { scene.remove(deskFolder); deskFolder = null; }
+    }
+    if (e.kind === "DONE" && e.agent !== "cto") fly(e.agent, "cto", 0x3fb67a);
+  }
+  first = false;
+  renderLog();
+  if (selected) renderAgent(selected);
+  $("approval").style.display = s.asking ? "block" : "none";
+  if (s.asking) {
+    $("apWho").innerHTML = `<b>${s.asking.agent}</b> wants to run <b>${s.asking.tool}</b>:`;
+    $("apWhat").textContent = s.asking.what;
+  }
+  $("empty").textContent = events.length ? "" : "The office is quiet. Give the CTO a goal below ↓";
+}
+
+const teamOf = n => n === "chandra" ? "cto" : roster[n]?.team || "cto";
+function evHTML(e, withWho = true) {
+  const team = teamOf(e.agent);
+  return `<div class="ev"><time>${e.ts.slice(11, 16)}</time><div>${withWho ? `<span class="who" style="color:${TEAM_CSS[team]}">${e.agent}</span>` : ""}<span class="kind k-${e.kind}">${e.kind}</span><div class="txt"></div></div></div>`;
+}
+function fill(container, list, withWho) {
+  container.innerHTML = list.map(e => evHTML(e, withWho)).join("");
+  container.querySelectorAll(".txt").forEach((el, i) => el.textContent = list[i].text);  // text, never HTML
+}
+function renderLog() {
+  const box = $("events"), atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
+  const list = events.filter(e => (showSteps || !["STEP", "TURN"].includes(e.kind)) &&
+    (filter === "all" || teamOf(e.agent) === filter || (filter === "cto" && teamOf(e.agent) === "ceo"))).slice(-120);
+  fill(box, list, true);
+  if (atBottom) box.scrollTop = box.scrollHeight;
+}
+function renderAgent(n) {
+  const r = roster[n], b = board[n] || {};
+  $("agent").style.display = "block";
+  $("aRole").textContent = n;
+  $("aTeam").textContent = r.team; $("aTeam").style.background = TEAM_CSS[r.team];
+  $("aDesc").textContent = r.desc;
+  $("aStatus").textContent = b.status || "idle"; $("aDone").textContent = b.done || 0; $("aTeam2").textContent = r.team;
+  $("aTask").textContent = b.task ? "Working on: " + b.task : "";
+  fill($("agentEvents"), events.filter(e => e.agent === n).slice(-12).reverse(), false);
+  $("msg").placeholder = n === "buddy" ? "Share an idea with CEO Buddy… attach PDFs or images with 📎"
+    : n === "cto" ? "Give the CTO a goal…" : `Message ${n} (via the CTO)…`;
+}
+
+// ── interaction ──
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+renderer.domElement.addEventListener("click", ev => {
+  mouse.set(ev.clientX / innerWidth * 2 - 1, -ev.clientY / innerHeight * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(scene.children, true).find(h => h.object.userData.agent);
+  if (hit) { selected = hit.object.userData.agent; renderAgent(selected); }
+});
+$("closeAgent").onclick = () => { selected = null; $("agent").style.display = "none"; $("msg").placeholder = "Share an idea with CEO Buddy… attach PDFs or images with 📎"; };
+let pending = [];                                           // File objects waiting to be sent
+const OK_TYPES = /\.(pdf|png|jpe?g|webp|gif|txt|md|csv)$/i;
+function addFiles(list) {
+  for (const f of list) {
+    if (!OK_TYPES.test(f.name)) { alert(`${f.name}: only PDF, image or text files`); continue; }
+    if (f.size > 25 * 1024 * 1024) { alert(`${f.name} is over 25 MB`); continue; }
+    pending.push(f);
+  }
+  renderChips();
+}
+function renderChips() {
+  $("chips").innerHTML = "";
+  pending.forEach((f, i) => {
+    const c = document.createElement("div"); c.className = "chip";
+    if (f.type.startsWith("image/")) { const img = document.createElement("img"); img.src = URL.createObjectURL(f); c.append(img); }
+    else c.append(Object.assign(document.createElement("b"), { textContent: f.name.endsWith(".pdf") ? "📄" : "📝" }));
+    c.append(Object.assign(document.createElement("span"), { textContent: f.name }));
+    const x = Object.assign(document.createElement("button"), { type: "button", textContent: "✕", ariaLabel: "Remove " + f.name });
+    x.onclick = () => { pending.splice(i, 1); renderChips(); };
+    c.append(x); $("chips").append(c);
+  });
+}
+$("files").onchange = e => { addFiles(e.target.files); e.target.value = ""; };
+addEventListener("dragover", e => { e.preventDefault(); document.body.classList.add("dragging"); });
+addEventListener("dragleave", e => { if (!e.relatedTarget) document.body.classList.remove("dragging"); });
+addEventListener("drop", e => { e.preventDefault(); document.body.classList.remove("dragging"); addFiles(e.dataTransfer.files); });
+$("ask").onsubmit = async ev => {
+  ev.preventDefault();
+  let text = $("msg").value.trim();
+  if (!text && !pending.length) return;
+  if (!text) text = "Here's my idea. Please study the attached files and come back with a plan.";
+  const btn = $("sendBtn"); btn.disabled = true; btn.textContent = pending.length ? "Uploading…" : "Sending…";
+  try {
+    const attachments = [];
+    for (const f of pending) {
+      const r = await fetch("/api/upload?name=" + encodeURIComponent(f.name), { method: "POST", body: f });
+      const j = await r.json(); if (!r.ok) throw new Error(j.error || "upload failed");
+      attachments.push(j.path);
+    }
+    const toAgent = selected && selected !== "buddy" ? selected : null;
+    await fetch("/api/message", { method: "POST", body: JSON.stringify(
+      { text, to: toAgent, attachments, via: toAgent ? null : "buddy" }) });
+    $("msg").value = ""; pending = []; renderChips();
+  } catch (e) { alert("Couldn't send: " + e.message); }
+  btn.disabled = false; btn.textContent = "Send";
+};
+const approve = ok => fetch("/api/approve", { method: "POST", body: JSON.stringify({ ok }) });
+$("apYes").onclick = () => approve(true); $("apNo").onclick = () => approve(false);
+document.querySelectorAll(".toggle").forEach(b => b.onclick = () => {
+  const on = b.getAttribute("aria-pressed") !== "true";
+  b.setAttribute("aria-pressed", on); document.body.classList.toggle(b.dataset.cls, !on);
+  resize();
+});
+$("filters").onclick = ev => {
+  const f = ev.target.dataset?.f; if (!f) return;
+  if (f === "steps") { showSteps = !showSteps; ev.target.setAttribute("aria-pressed", showSteps); }
+  else { filter = f; $("filters").querySelectorAll("[data-f]:not([data-f=steps])").forEach(b => b.setAttribute("aria-pressed", b.dataset.f === f)); }
+  renderLog();
+};
+
+// ── Buddy, the CEO, walks the project files over to the CTO ──
+let ceoTrip = null, deskFolder = null;
+const V3 = (x, z) => new THREE.Vector3(x, 0, z);
+function startTrip(project) {
+  const a = agents.buddy; if (!a || ceoTrip) return;
+  const body = a.body, home = body.getWorldPosition(new THREE.Vector3());
+  scene.attach(body);                                  // keep his place in the world while he walks
+  body.rotation.set(0, body.rotation.y, 0);
+  body.userData.sit.visible = false; body.userData.stand.forEach(l => l.visible = true);
+  const folder = box(.55, .08, .42, mat(0xf2c14e), 0, 1.5, -.55, body);          // in his hands
+  ceoTrip = { folder, home, back: false, i: 0, pause: .6, walk: 0,
+              path: [V3(0, home.z - 1.6), V3(0, -1.6), V3(0, -7.6)], say: `📁 Briefing the CTO: ${project}` };
+  const b = agents.buddy.bubble; b.textContent = ceoTrip.say; b.style.display = "";
+}
+function stepTrip(dt) {
+  const tr = ceoTrip; if (!tr) return;
+  const body = agents.buddy.body;
+  if (tr.pause > 0) { tr.pause -= dt; return; }        // standing up / handing over
+  const target = tr.path[tr.i], d = target.clone().sub(body.position); d.y = 0;
+  const step = 2.6 * dt;
+  if (d.length() > step) {
+    d.normalize(); body.position.addScaledVector(d, step);
+    body.rotation.y = Math.atan2(-d.x, -d.z);          // he faces local -z
+    tr.walk += dt * 9;
+    body.userData.stand.forEach((l, k) => l.rotation.x = Math.sin(tr.walk + k * Math.PI) * .45);
+    body.position.y = .35 + Math.abs(Math.sin(tr.walk)) * .05;
+    return;
+  }
+  body.position.set(target.x, .35, target.z);
+  if (++tr.i < tr.path.length) return;
+  if (!tr.back) {                                       // at the manager's desk: put the folder down
+    deskFolder = tr.folder; scene.attach(deskFolder);
+    deskFolder.position.set(.4, 1.17, -8.8); deskFolder.rotation.set(0, .3, 0);
+    Object.assign(tr, { back: true, i: 0, pause: 1.2, say: "Here's the project 👍",
+                        path: [V3(0, -1.6), V3(0, tr.home.z - 1.6), V3(tr.home.x, tr.home.z)] });
+    body.rotation.y = Math.PI;                          // faces the manager
+    agents.buddy.bubble.textContent = tr.say;
+    return;
+  }
+  const a = agents.buddy;                               // home: sit back down
+  a.g.attach(body); body.position.set(0, 0, .1); body.rotation.set(0, 0, 0);
+  body.userData.sit.visible = true; body.userData.stand.forEach(l => { l.visible = false; l.rotation.x = 0; });
+  ceoTrip = null;
+}
+
+// ── loop ──
+function resize() {
+  renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight;
+  // centre the building in the space the log panel leaves free
+  const off = document.body.classList.contains("no-log") || innerWidth < 760 ? 0 : $("log").offsetWidth / 2;
+  camera.setViewOffset(innerWidth, innerHeight, off, 0, innerWidth, innerHeight);
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize); resize();
+const clock = new THREE.Clock(), v = new THREE.Vector3();
+function frame() {
+  const t = clock.getElapsedTime(), dt = Math.min(t - (frame.last ?? t), .1); frame.last = t;
+  stepTrip(dt);
+  stepStory(dt);
+  controls.update();
+  for (const [n, a] of Object.entries(agents)) {
+    const working = a.status === "working", waiting = a.status === "waiting";
+    const walking = (n === "buddy" && ceoTrip) || a.out;
+    a.body.visible = !a.leave;
+    if (!walking) a.body.position.y = working ? Math.abs(Math.sin(t * 9 + a.phase)) * .05 : 0;          // typing
+    if (!walking) a.body.rotation.x = working ? -.12 + Math.sin(t * 2 + a.phase) * .03 : waiting ? Math.sin(t * 6) * .08 : .12;  // lean in / fidget / lean back
+    a.ring.material.opacity = working ? .55 + Math.sin(t * 4) * .25 : waiting ? .9 : 0;
+    a.ring.material.color.set(waiting ? 0xf2b632 : 0x3fb67a);
+    a.screen.material.emissive.set(working ? (a.team === "hardware" ? 0x3dff7a : 0x5fd0ff) : NIGHT ? 0x1a2a3a : 0x000000);
+    // label position
+    if (walking) { a.body.getWorldPosition(v); v.y += 2.6; } else { v.copy(a.g.position); v.y += 2.9; }
+    v.project(camera);
+    const vis = v.z < 1;
+    a.el.style.display = vis ? "" : "none";
+    a.el.style.left = (v.x * .5 + .5) * innerWidth + "px";
+    a.el.style.top = (-v.y * .5 + .5) * innerHeight + "px";
+  }
+  for (let i = flights.length - 1; i >= 0; i--) {
+    const f = flights[i]; f.t += 0.016 / 1.3;
+    f.m.position.lerpVectors(f.a, f.b, Math.min(f.t, 1)); f.m.position.y += Math.sin(Math.min(f.t, 1) * Math.PI) * 3;
+    f.m.rotation.y += .15;
+    if (f.t >= 1) { scene.remove(f.m); flights.splice(i, 1); }
+  }
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+// ── story mode (?story): a scripted sprint in the office, with captions, for demos and videos ──
+// ponytail: scripted, not driven by real agent runs; feed stress from real events if it's wanted live
+const STORY = new URLSearchParams(location.search).has("story");
+const wait = ms => new Promise(r => setTimeout(r, ms));
+let camTween = null, storyClock = "09:00", storyAsking = null;
+const walks = {}, beams = [], confetti = [];
+function camTo(p, t, ms = 2500) {
+  camTween = { p0: camera.position.clone(), t0: controls.target.clone(), p1: new THREE.Vector3(...p), t1: new THREE.Vector3(...t), s: performance.now(), ms };
+  return wait(ms);
+}
+function walkTo(n, x, z) {       // stand up and walk somewhere (the body leaves the desk group)
+  const a = agents[n], body = a.body;
+  if (!a.out) {
+    a.home = body.getWorldPosition(new THREE.Vector3()); scene.attach(body); body.rotation.set(0, body.rotation.y, 0); a.out = true;
+    if (body.userData.stand) { body.userData.sit.visible = false; body.userData.stand.forEach(l => l.visible = true); }
+  }
+  return new Promise(done => walks[n] = { to: new THREE.Vector3(x, 0, z), done });
+}
+async function walkHome(n) {
+  const a = agents[n]; if (!a.out) return;
+  await walkTo(n, a.home.x, a.home.z);
+  a.g.attach(a.body); a.body.position.set(0, 0, .1); a.body.rotation.set(0, 0, 0); a.out = false;
+  if (a.body.userData.stand) { a.body.userData.sit.visible = true; a.body.userData.stand.forEach(l => { l.visible = false; l.rotation.x = 0; }); }
+}
+function beam(x, y) {             // a pulsing red bar between two people who disagree
+  const pa = agents[x].g.position.clone().setY(2.7), pb = agents[y].g.position.clone().setY(2.7);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(.14, .14, pa.distanceTo(pb)), new THREE.MeshBasicMaterial({ color: 0xe5534b, transparent: true }));
+  m.position.lerpVectors(pa, pb, .5); m.lookAt(pb); scene.add(m); beams.push(m); return m;
+}
+function setNight(on) {
+  const sky = on ? 0x1b2340 : 0xcfe8f7;
+  scene.background.set(sky); scene.fog.color.set(sky);
+  hemi.intensity = on ? .55 : 1.5; sun.intensity = on ? .35 : 1.7; roomLights.forEach(l => l.visible = on);
+}
+function stepStory(dt) {
+  if (camTween) {
+    const k = Math.min(1, (performance.now() - camTween.s) / camTween.ms), e = k * k * (3 - 2 * k);
+    camera.position.lerpVectors(camTween.p0, camTween.p1, e); controls.target.lerpVectors(camTween.t0, camTween.t1, e);
+    if (k === 1) camTween = null;
+  }
+  for (const [n, w] of Object.entries(walks)) {
+    const body = agents[n].body, d = w.to.clone().sub(body.position); d.y = 0;
+    const step = 3.2 * dt; body.userData.walk = (body.userData.walk || 0) + dt * 9;
+    if (d.length() > step) {
+      d.normalize(); body.position.addScaledVector(d, step); body.rotation.y = Math.atan2(-d.x, -d.z);
+      body.position.y = .35 + Math.abs(Math.sin(body.userData.walk)) * .06;
+      body.userData.stand?.forEach((l, k) => l.rotation.x = Math.sin(body.userData.walk + k * Math.PI) * .45);
+    } else { body.position.set(w.to.x, .35, w.to.z); delete walks[n]; w.done(); }
+  }
+  for (const b of beams) b.material.opacity = .5 + Math.sin(performance.now() / 120) * .4;
+  for (let i = confetti.length - 1; i >= 0; i--) {
+    const c = confetti[i]; c.position.addScaledVector(c.userData.v, dt); c.userData.v.y -= 6 * dt; c.rotation.x += dt * 5;
+    if (c.position.y < 0) { scene.remove(c); confetti.splice(i, 1); }
+  }
+}
+
+async function story() {
+  document.body.classList.add("story");
+  board = Object.fromEntries(Object.keys(roster).map(n => [n, { team: roster[n].team, status: "idle", task: "", done: 0 }]));
+  first = false;
+  const refresh = () => { update({ queued: 0, asking: storyAsking }); $("live").textContent = "📅 " + storyClock; $("live").style.color = "var(--ink)"; };
+  const S = (n, status, task = "") => { Object.assign(board[n], { status, task }); refresh(); };
+  const say = (n, text, angry = false) => { agents[n].say = text || undefined; agents[n].angry = angry; refresh(); };
+  const ev = (agent, kind, text, extra = {}) => { events.push({ ts: "2026-10-19 " + storyClock.slice(4, 9) + ":00", agent, kind, text, ...extra }); refresh(); };
+  const stress = (n, v) => { const el = agents[n].stressEl; el.style.width = v + "%"; el.style.background = v > 75 ? "var(--bad)" : v > 45 ? "var(--warn)" : "var(--ok)"; };
+  const time = t => { storyClock = t; refresh(); };
+  const cap = (tag, title, text, lesson = "") => { $("capTag").textContent = tag; $("capTitle").textContent = title; $("capText").innerHTML = text; $("capLesson").textContent = lesson; console.log("CAP", title); };
+  const ALL = Object.keys(roster), STAFF = ALL.filter(n => !["buddy", "cto"].includes(n));
+  const team = t => ALL.filter(n => roster[n].team === t);
+  ALL.forEach(n => stress(n, 10));
+  const OVERVIEW = [[0, 38, 40], [0, 0, 3]];
+
+  // 0 · intro
+  time("Mon 09:00 · Sprint day 1 of 10");
+  cap("Agent Office · built with Claude Agent SDK + three.js", "21 AI agents. One real office.",
+      "A CEO, a CTO and 19 specialists plan, build, argue, take leave, burn out and ship, just like a real team.");
+  camera.position.set(-55, 45, 60); controls.target.set(0, 0, 0);
+  await camTo(...OVERVIEW, 6000);
+
+  // 1 · the org
+  cap("Chapter 1", "The org chart", "👔 <b>CEO Buddy</b> sets the vision · 🟣 <b>CTO</b> plans, delegates, runs quality gates · 🩷 <b>Product</b> (PM + researcher) · 🟢 <b>Operations</b> (manager + parts sourcer): budget, orders, schedule");
+  await camTo([0, 16, 14], [0, 0, -4], 3000);
+  say("buddy", "I set the vision 🎯"); say("cto", "I plan & delegate 📋");
+  await wait(2500);
+  say("buddy"); say("cto");
+  cap("Chapter 1", "The org chart", "🔵 <b>Software team</b> (8): architecture, frontend, backend, AI/ML, QA, code review, DevOps, security");
+  await camTo([-14, 20, 16], [-14, 0, -3], 2500);
+  team("software").forEach(n => S(n, "working", "👋 " + n.replace(/-/g, " ")));
+  await wait(3000); team("software").forEach(n => S(n, "idle"));
+  cap("Chapter 1", "The org chart", "🟠 <b>Hardware lab</b> (7): architecture, circuits, PCB, firmware, CAD, test, debug");
+  await camTo([14, 20, 16], [14, 0, -3], 2500);
+  [...team("hardware"), ...team("product"), ...team("operations")].forEach(n => S(n, "working", "👋 " + n.replace(/-/g, " ")));
+  await wait(3000); [...team("hardware"), ...team("product"), ...team("operations")].forEach(n => S(n, "idle"));
+  await camTo(...OVERVIEW, 2500);
+
+  // 2 · the vision
+  time("Mon 09:30 · Sprint day 1 of 10");
+  cap("Chapter 2", "The CEO's vision", "Founder → CEO Buddy: <i>“Build <b>Lumi</b>: a desk lamp that knows when you're tired. Demo in 10 days.”</i> Buddy walks the brief to the CTO.");
+  ev("buddy", "GOAL", "Build Lumi: a desk lamp that knows when you're tired. Demo in 10 days.", { project: "lumi" });
+  await camTo([0, 18, 12], [0, 0, -4], 3000);
+  await wait(2000); while (ceoTrip) await wait(200);
+  S("cto", "working", "Running the Lumi sprint");
+  ev("cto", "SAY", "Flow: kickoff → spec + acceptance criteria → founder approves → leads split the work → build → review & test → demo.");
+
+  // 3 · kickoff, then spec, then plan: nobody builds before the spec is approved
+  cap("Chapter 3", "Kickoff", "Nobody builds yet. The CTO brings the CEO, Product, both team leads and Operations together: goal, users, deadline, budget.");
+  say("cto", "Kickoff first. Meeting room 📋");
+  await camTo([17.5, 14, 22], [17.5, 0, 9], 2500);
+  const seats = [[15.1, 8.4], [16.7, 8.4], [18.3, 8.4], [19.9, 8.4], [16.3, 11.8], [18.7, 11.8]];
+  const room = ["product-manager", "software-architect", "hardware-architect", "operations-manager", "cto", "buddy"];
+  room.forEach(n => say(n));
+  await Promise.all(room.map((n, i) => walkTo(n, ...seats[i])));
+  say("buddy", "For students who study late. Demo in 10 days, under ₹3,000.");
+  say("operations-manager", "Parts take 4–5 days to arrive 📦");
+  await wait(4500);
+  room.forEach(n => say(n));
+  cap("Chapter 3", "Spec review", "Product drafts the spec with acceptance criteria. In review, one word means different things to different people.");
+  S("product-manager", "working", "Lumi spec v1"); ev("cto", "SEND", "→ product-manager: Write the Lumi spec with acceptance criteria");
+  await wait(1500);
+  say("product-manager", "v1: dims when you look tired 💡");
+  await wait(1500);
+  say("hardware-architect", "Tired… so a battery camping lamp? 🔦");
+  say("software-architect", "Tired = sleep tracker app? 📱");
+  ["hardware-architect", "software-architect"].forEach(n => stress(n, 40));
+  await wait(3500);
+  say("buddy", "“Tired” = slouching + slow blinks on camera → dim the light, suggest a break.");
+  say("hardware-architect"); say("software-architect");
+  await wait(4000);
+  room.forEach(n => say(n)); ["hardware-architect", "software-architect"].forEach(n => { say(n, "✅ Got it"); stress(n, 20); });
+  ev("product-manager", "DONE", "Spec v2: posture + blink detection, dim to 30%, break reminder. Acceptance criteria written.");
+  ev("buddy", "APPROVE", "Founder approved Lumi spec v2");
+  S("product-manager", "idle");
+  cap("Chapter 3", "Spec review", "Caught in a 20-minute review, not after two days of building. The founder approves spec v2.", "Write a one-page spec + acceptance criteria and get it approved BEFORE anyone builds.");
+  await wait(3500);
+  room.forEach(n => say(n));
+  await Promise.all(room.map(walkHome));
+
+  cap("Chapter 3", "Leads plan → CTO delegates", "Each lead splits their team's work, Operations checks budget and lead times, then the CTO sends the briefs. ✉️ Envelopes = hand-offs.");
+  await camTo(...OVERVIEW, 2000);
+  S("software-architect", "working", "Splitting software work"); S("hardware-architect", "working", "Splitting hardware work"); S("operations-manager", "working", "Budget + order dates");
+  await wait(2500);
+  ["software-architect", "hardware-architect", "operations-manager"].forEach(n => S(n, "idle"));
+  for (const [n, t] of [["software-architect", "App + vision pipeline design"], ["ai-ml-engineer", "Tiredness model"], ["frontend-dev", "Brightness app"], ["backend-dev", "Device API"], ["circuit-designer", "LED driver + camera power"], ["firmware-engineer", "ESP32 lamp firmware"], ["cad-designer", "Lamp enclosure"], ["pcb-designer", "Lumi board"], ["bom-sourcer", "Price the parts in ₹"]]) {
+    ev("cto", "SEND", `→ ${n}: ${t}`); await wait(300); S(n, "working", t); stress(n, 25);
+  }
+  await wait(3000);
+
+  // 4 · holidays
+  time("Wed 09:00 · Sprint day 4 of 10 · 🪔 Diwali");
+  cap("Chapter 4", "Holidays happen", "Diwali week: the Firmware Engineer and the Frontend Dev are on leave. Their work can't just stop.");
+  for (const n of ["firmware-engineer", "frontend-dev"]) { S(n, "idle"); agents[n].leave = true; say(n, "🪔 On Diwali leave"); }
+  await camTo([0, 30, 30], [0, 0, -3], 2500); await wait(3000);
+  ev("cto", "SEND", "→ embedded-debugger: Cover firmware: finish the camera driver");
+  await wait(600); S("embedded-debugger", "working", "Covering firmware 🔧"); stress("embedded-debugger", 55);
+  ev("cto", "SEND", "→ backend-dev: Cover frontend: the brightness slider");
+  await wait(600); S("backend-dev", "working", "Covering frontend + my APIs"); stress("backend-dev", 60);
+  cap("Chapter 4", "Holidays happen", "The CTO hands the work to backup owners. Their load (and stress bar) goes up.", "Plan leave into the sprint and name a backup owner for every area.");
+  await wait(5000);
+
+  // 5 · deadline pressure
+  time("Thu 11:00 · Sprint day 8 of 10 · ⏳ Demo in 2 days");
+  for (const n of ["firmware-engineer", "frontend-dev"]) { agents[n].leave = false; say(n); S(n, "working", "Back, catching up"); stress(n, 50); }
+  cap("Chapter 5", "Deadline pressure", "Day 8. Demo in 2 days. Bugs, late parts and failed prints pile up. Watch the stress bars climb.");
+  STAFF.forEach(n => S(n, "working", board[n].task || "Sprint work"));
+  const crunch = { "qa-tester": "🐞 7 bugs open", "pcb-designer": "📦 JLCPCB order is late", "cad-designer": "Print failed, re-slicing 😤",
+                   "backend-dev": "API + slider + bugs 😰", "ai-ml-engineer": "Blink model only 71% accurate", "bom-sourcer": "Camera module out of stock" };
+  for (let k = 0; k < 4; k++) { STAFF.forEach(n => stress(n, Math.min(95, 35 + k * 15 + (n in crunch ? 15 : 0)))); await wait(1000); }
+  for (const [n, t] of Object.entries(crunch)) { say(n, t); await wait(500); }
+  await wait(3500);
+  Object.keys(crunch).forEach(n => say(n));
+
+  // 6 · overtime
+  setNight(true); time("Thu 21:40 · ⏳ Demo in 1 day");
+  const late = ["backend-dev", "qa-tester", "embedded-debugger", "pcb-designer", "ai-ml-engineer"];
+  STAFF.filter(n => !late.includes(n)).forEach(n => { S(n, "idle"); agents[n].leave = true; });
+  cap("Chapter 6", "Overtime", "21:40. Most of the office has gone home. Five people are still at their desks.");
+  await camTo([0, 30, 28], [0, 0, -3], 2500);
+  say("backend-dev", "😵 4th coffee, 13th hour", true); stress("backend-dev", 98);
+  say("qa-tester", "Re-testing the same bug again…"); stress("qa-tester", 85);
+  await wait(4000);
+  ev("cto", "SAY", "Burnout guard: backend-dev is at 98% stress. Sending them home; QA takes the last bug.");
+  say("cto", "Backend, go home. We'll finish tomorrow 🏠");
+  await wait(2500);
+  S("backend-dev", "idle"); say("backend-dev"); agents["backend-dev"].leave = true; stress("backend-dev", 40);
+  cap("Chapter 6", "Overtime", "The CTO sends the most stressed person home and rebalances the work.", "Burnout guard: when stress passes 90%, force a break and rebalance. Tired people ship bugs.");
+  await wait(5000);
+  say("qa-tester"); say("cto");
+
+  // 7 · conflict
+  setNight(false); time("Fri 10:00 · ⏳ Demo tomorrow");
+  STAFF.forEach(n => { agents[n].leave = false; S(n, "working", "Final fixes"); stress(n, 60); });
+  cap("Chapter 7", "Conflict", "Backend wants to ship now. The Code Reviewer blocks the merge. Both are sure they are right.");
+  await camTo([-14, 18, 14], [-14, 0, -3], 2500);
+  say("backend-dev", "Ship it! Demo is TOMORROW 🚀", true);
+  await wait(1500);
+  say("code-reviewer", "CHANGES NEEDED ❌ camera frames saved unencrypted", true);
+  const clash = beam("backend-dev", "code-reviewer");
+  stress("backend-dev", 88); stress("code-reviewer", 80);
+  await wait(4000);
+  ev("cto", "SEND", "→ security-engineer: Settle it: is unencrypted camera storage a blocker?");
+  await wait(800);
+  say("security-engineer", "Reviewer is right: privacy blocker 🔒");
+  await wait(3000);
+  say("cto", "Rule: blockers fix now, nits go to v1.1. Encrypt (2h), log the 4 style nits.");
+  cap("Chapter 7", "Conflict → decision", "The CTO asks the expert for facts, then decides with a rule everyone agreed on earlier.", "Argue about facts, decide with a rule: blockers now, nice-to-haves to the backlog.");
+  await wait(4500);
+  scene.remove(clash); beams.length = 0;
+  say("backend-dev", "Fair. Encrypting now 🤝"); say("code-reviewer", "✅ APPROVE after the fix"); stress("backend-dev", 45); stress("code-reviewer", 35);
+  await wait(3500);
+  ["backend-dev", "code-reviewer", "security-engineer", "cto"].forEach(n => say(n));
+
+  // 8 · human in the loop
+  time("Fri 18:00 · ⏳ Demo tomorrow");
+  cap("Chapter 8", "The human stays in charge", "Flashing a real board, deploying, deleting or spending money always stops and asks the founder.");
+  await camTo([14, 22, 18], [14, 0, -3], 2500);
+  S("embedded-debugger", "waiting"); ev("embedded-debugger", "ASK", "Bash: pio run -t upload");
+  storyAsking = { agent: "embedded-debugger", tool: "Bash", what: "pio run -t upload   # flash Lumi's ESP32" }; refresh();
+  await wait(4500);
+  $("apYes").style.outline = "4px solid var(--ok)"; await wait(900); $("apYes").style.outline = "";
+  storyAsking = null; S("embedded-debugger", "working", "Flashing Lumi ⚡"); ev("embedded-debugger", "APPROVE", "Bash: pio run -t upload");
+  cap("Chapter 8", "The human stays in charge", "Approved from the 3D office (or by voice through Buddy). Every action lands in the execution log on the right.", "Agents do the work; humans approve anything risky or irreversible.");
+  await wait(4500);
+
+  // 9 · launch
+  time("Sat 11:00 · 🎉 Demo day");
+  cap("Chapter 9", "Ship it", "Every task reports DONE to the CTO, who reports to the CEO. Lumi is demoed on time.");
+  await camTo(...OVERVIEW, 2000);
+  for (const n of STAFF) { ev(n, "DONE", "Lumi: my part is done"); board[n].done += 1; S(n, "idle"); stress(n, 15); await wait(160); }
+  await wait(1500);
+  ev("cto", "DONE", "all agents finished");
+  say("buddy", "Lumi shipped 🎉 Thank you, team!");
+  for (let i = 0; i < 220; i++) {
+    const c = new THREE.Mesh(new THREE.BoxGeometry(.25, .25, .05), new THREE.MeshBasicMaterial({ color: Object.values(TEAM)[i % 5] }));
+    c.position.set((rand() - .5) * 40, 10 + rand() * 6, (rand() - .5) * 26); c.userData.v = new THREE.Vector3((rand() - .5) * 2, rand() * 2, (rand() - .5) * 2);
+    scene.add(c); confetti.push(c);
+  }
+  await wait(5000);
+  say("buddy");
+
+  // 10 · takeaways
+  cap("What students & startups can learn", "Run your work like this office",
+      `<ul><li>Kickoff → spec + acceptance criteria → approval, before anyone builds</li><li>Leads plan → CTO delegates → review, with quality gates</li>
+       <li>Plan leave; give every area a backup owner</li><li>Watch stress, stop overtime before it becomes bugs</li>
+       <li>Settle conflicts with facts and agreed rules</li><li>Humans approve anything risky</li></ul>`);
+  await camTo([-40, 40, 50], [0, 0, 0], 9000);
+  cap("Agent Office", "Built with Claude Agent SDK + three.js", "21 agents · real files · live 3D office · voice control through Buddy.");
+  await wait(6000);
+  window.storyDone = true;
+}
+
+roster = await (await fetch("/api/roster")).json();
+const pos = layout(Object.keys(roster));
+Object.keys(roster).forEach((n, i) => buildAgent(n, pos[n], i));
+STORY ? story() : poll(); frame();
+</script>
+</body>
+</html>
