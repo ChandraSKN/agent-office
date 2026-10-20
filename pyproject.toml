@@ -1,7 +1,7 @@
 [project]
 name = "agent-office"
 version = "0.1.0"
-description = "AI office: an Ops Manager + software and hardware agent teams"
+description = "Run a startup before you start one: a CEO, a CTO and 19 AI specialists doing real work in a live 3D office"
 authors = [
     { name = "Chandra Nadendla", email = "chandra.nadendla@trinnovate.in" }
 ]
