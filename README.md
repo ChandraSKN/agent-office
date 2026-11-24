@@ -2,6 +2,12 @@
 
 Open source (MIT). A CTO and 19 AI specialists, powered by Claude, doing real work in a live 3D office.
 
+![The 3D office: software team, hardware lab, CTO and CEO at their desks](docs/office.png)
+
+| ✨ Realistic mode: animated, dressed 3D people | First run: paste your Claude API key |
+|---|---|
+| ![Realistic mode](docs/realistic.png) | ![API key popup](docs/key-popup.png) |
+
 ## Quick start
 
 ```bash
