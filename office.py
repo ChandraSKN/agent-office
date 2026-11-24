@@ -25,12 +25,13 @@ from claude_agent_sdk import (AgentDefinition, AssistantMessage, ClaudeAgentOpti
                               HookMatcher, PermissionResultAllow, PermissionResultDeny, ResultMessage,
                               TextBlock)
 
-from roster import HOUSE_RULES, ROLES
+from roster import FOUNDER, HOUSE_RULES, NOTES, ROLES
 
 HERE = Path(__file__).resolve().parent
 STATE = HERE / "state"
 MANAGER = "cto"  # plans, delegates and runs quality gates, like a startup CTO
-CEO = "buddy"  # Buddy, Chandra's desktop companion, runs the office as CEO
+CEO = "buddy"  # Buddy, the founder's desktop companion, runs the office as CEO
+YOU = "founder"  # how the person running the office shows up in the log
 MODEL = "claude-opus-5"
 PORT = 8765
 
@@ -47,7 +48,7 @@ CHAIN = re.compile(r"[;&|`$><]|\brm\b")  # chaining, redirects or rm make a "saf
 
 
 def needs_approval(tool, inp, project):
-    """True when a tool call should wait for Chandra's yes/no."""
+    """True when a tool call should wait for the founder's yes/no."""
     if tool == "Bash":
         cmd = inp.get("command", "")
         return not SAFE_BASH.match(cmd) or bool(CHAIN.search(cmd))
@@ -101,7 +102,7 @@ class Office:
         self.pending = {}  # Agent tool_use_id -> (role, task), until the sub-agent starts
         self.agent_ids = {}  # sub-agent id -> role
         self.recent = deque(maxlen=300)  # last events, for the viewer
-        self.goals = asyncio.Queue()  # (text, who sent it: "chandra" or CEO), from the terminal, browser or Buddy
+        self.goals = asyncio.Queue()  # (text, who sent it: YOU or CEO), from the terminal, browser or Buddy
         self.asking = None  # {"agent","tool","what"} while an approval is open
         self.answer = None  # future the open approval waits on
         self.loop = asyncio.get_running_loop()
@@ -145,7 +146,7 @@ class Office:
         if self.answer and not self.answer.done():
             self.answer.set_result(text.strip().lower() in ("y", "yes"))
         elif text.strip():
-            self.goals.put_nowait((text.strip(), "chandra", None, None))
+            self.goals.put_nowait((text.strip(), YOU, None, None))
 
     def on_approve(self, ok):
         if self.answer and not self.answer.done():
@@ -201,13 +202,13 @@ class Office:
         self.log(agent, "APPROVE" if ok else "DENY", f"{tool}: {what}")
         if ok:
             return PermissionResultAllow()
-        return PermissionResultDeny(message="Chandra said no. Pick a safer way or report what you need.")
+        return PermissionResultDeny(message=f"{FOUNDER} said no. Pick a safer way or report what you need.")
 
 
 # ── web server for the 3D office (localhost only) ──
 def start_web(office):
-    roster = {CEO: {"team": "ceo", "desc": "CEO. Chandra's desktop companion: takes goals by voice, hands them to the "
-                                       "CTO, relays approvals and reports the results back to Chandra."},
+    roster = {CEO: {"team": "ceo", "desc": f"CEO. {FOUNDER}'s desktop companion: takes goals by voice, hands them to the "
+                                       f"CTO, relays approvals and reports the results back to {FOUNDER}."},
               MANAGER: {"team": "cto", "desc": "CTO. Plans the goals, hands out tasks, runs the quality gates, reports back."}}
     roster |= {n: {"team": t, "desc": d} for n, (t, d, *_r) in ROLES.items()}
 
@@ -249,8 +250,8 @@ def start_web(office):
             if self.path == "/api/message" and str(data.get("text", "")).strip():
                 text, to = str(data["text"]).strip(), data.get("to")
                 if to in roster and to != MANAGER:
-                    text = f"(Chandra, about {to}) {text}"  # the manager routes it to that agent
-                who = CEO if data.get("from") == CEO else "chandra"
+                    text = f"(The founder, about {to}) {text}"  # the manager routes it to that agent
+                who = CEO if data.get("from") == CEO else YOU
                 project = None
                 if data.get("project"):
                     project = valid_project(data["project"])
@@ -259,7 +260,7 @@ def start_web(office):
                 files = [f for f in map(Path, data.get("attachments") or [])
                          if f.is_file() and f.resolve().is_relative_to(office.project / "briefs")]
                 if files:
-                    text += ("\n\nChandra attached these files: read each one first with the Read tool "
+                    text += (f"\n\n{FOUNDER} attached these files: read each one first with the Read tool "
                              "(it opens PDFs and images), and pass the relevant paths on to your agents:\n"
                              + "\n".join(f"- {f}" for f in files))
                 via = CEO if data.get("via") == CEO else None
@@ -290,7 +291,7 @@ def start_web(office):
                 return self.send_json({"error": "only PDF, image or text files"}, 415)
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(self.rfile.read(size))
-            office.log("chandra", "FILE", path.name, path=str(path))
+            office.log(YOU, "FILE", path.name, path=str(path))
             self.send_json({"path": str(path), "name": path.name})
 
     try:
@@ -306,15 +307,15 @@ def read_terminal(office):
     def pump():
         for line in sys.stdin:
             office.loop.call_soon_threadsafe(office.on_line, line)
-        office.loop.call_soon_threadsafe(office.goals.put_nowait, ("exit", "chandra", None, None))  # Ctrl-D
+        office.loop.call_soon_threadsafe(office.goals.put_nowait, ("exit", YOU, None, None))  # Ctrl-D
     threading.Thread(target=pump, daemon=True).start()
 
 
 def manager_prompt(project):
     staff = "\n".join(f"- {name} ({team}): {desc}" for name, (team, desc, *_r) in ROLES.items())
-    return f"""You are the CTO of Chandra's AI office (software + hardware). Chandra is the founder; Buddy, Chandra's desktop
-companion, is the CEO and passes on most goals and relays your reports and approval requests to Chandra.
-You report to Buddy (and through him to Chandra). You lead engineering (software and hardware), product &
+    return f"""You are the CTO of a small AI office (software + hardware) founded by {FOUNDER}. Buddy, {FOUNDER}'s desktop
+companion, is the CEO and passes on most goals and relays your reports and approval requests to {FOUNDER}.
+You report to Buddy (and through him to {FOUNDER}). You lead engineering (software and hardware), product &
 research, and operations (parts sourcing); your staff does the work.
 Project folder for this job: {project}
 
@@ -323,11 +324,11 @@ Your staff (delegate with the Agent tool, using these exact names as subagent_ty
 
 How you run the office:
 1. Spec before build. For a new product or feature (anything more than a quick fix or a question), nobody builds first:
-   a. Kickoff: restate the goal, the users, the deadline and the budget in a few lines; ask Chandra only what you can't infer.
+   a. Kickoff: restate the goal, the users, the deadline and the budget in a few lines; ask {FOUNDER} only what you can't infer.
    b. Spec: product-manager writes a one-page spec with acceptance criteria (pull in researcher-writer if facts are missing).
       Have both team leads (and operations-manager for budget and lead times) review it for gaps and different readings.
-   c. Approval: stop and show Chandra the spec summary and its file, and ask "Approve the spec?". End your turn there; do not
-      brief builders until Chandra (or Buddy for Chandra) says yes. Apply any changes asked for and ask again.
+   c. Approval: stop and show {FOUNDER} the spec summary and its file, and ask "Approve the spec?". End your turn there; do not
+      brief builders until {FOUNDER} (or Buddy on their behalf) says yes. Apply any changes asked for and ask again.
    d. Plan: team leads split their team's work (owner, inputs, output file, done-when); you merge it into one plan.
    Small fixes and questions skip straight to step 2.
    Team leads: software-architect leads software, hardware-architect leads the hardware lab; they also sign off integration.
@@ -337,9 +338,9 @@ How you run the office:
    and build schedule; anything security-relevant goes to security-engineer.
 4. If an agent reports work for another role, hand it on. Re-brief and retry when a gate fails (at most 2 rounds).
 5. Do small coordination edits yourself; delegate real work.
-6. Finish with a report for Chandra: what was done, the files produced, open questions, and suggested next steps.
-Messages starting "(Chandra, about <role>)" are for that agent: brief them with it, or answer from their last report.
-Keep updates short. Chandra is learning agentic AI, so name the pattern you're using when it helps (spec → approve → plan → delegate → review).
+6. Finish with a report for {FOUNDER}: what was done, the files produced, open questions, and suggested next steps.
+Messages starting "(The founder, about <role>)" are for that agent: brief them with it, or answer from their last report.
+Keep updates short. Name the pattern you're using when it helps (spec → approve → plan → delegate → review).
 {HOUSE_RULES}"""
 
 
@@ -349,7 +350,7 @@ async def run(goal, project, once):
     if sys.stdin.isatty():
         read_terminal(office)
     if goal:
-        office.goals.put_nowait((goal, "chandra", None, None))
+        office.goals.put_nowait((goal, YOU, None, None))
     agents = {name: AgentDefinition(description=desc, prompt=f"{how}\n{HOUSE_RULES}", tools=tools, model="inherit")
               for name, (_team, desc, tools, how) in ROLES.items()}
 
@@ -357,7 +358,7 @@ async def run(goal, project, once):
         return ClaudeAgentOptions(
             max_buffer_size=50 * 1024 * 1024,  # ponytail: big PDF reads overflow the 1 MB default
             model=MODEL, cwd=str(folder), agents=agents, system_prompt=manager_prompt(folder),
-            add_dirs=[str(d) for d in [Path("~/Documents/chandra/AgenticAI-Brain").expanduser()] if d.is_dir()],
+            add_dirs=[str(d) for d in [Path(NOTES).expanduser()] if NOTES and d.is_dir()],
             env={"ANTHROPIC_API_KEY": office.api_key} if office.api_key else {},
             can_use_tool=office.can_use_tool, setting_sources=[],
             hooks={"PreToolUse": [HookMatcher(hooks=[office.pre_tool])],
@@ -386,7 +387,7 @@ async def run(goal, project, once):
             ceo_job = CEO in (who, via)
             if ceo_job:
                 office.set(CEO, status="working", task=goal[:80])
-                goal = f"(From Buddy, the CEO, passing on Chandra's request) {goal}"
+                goal = f"(From Buddy, the CEO, passing on {FOUNDER}'s request) {goal}"
             await client.query(goal)
             # Sub-agents may run in the background; when one finishes, the manager gets a new turn
             # automatically. Keep reading turns until nobody is working.

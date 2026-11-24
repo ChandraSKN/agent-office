@@ -606,7 +606,7 @@ function update(s) {
   $("empty").textContent = events.length ? "" : "The office is quiet. Give the CTO a goal below ↓";
 }
 
-const teamOf = n => n === "chandra" ? "cto" : roster[n]?.team || "cto";
+const teamOf = n => n === "founder" || n === "chandra" ? "cto" : roster[n]?.team || "cto";
 function evHTML(e, withWho = true) {
   const team = teamOf(e.agent);
   return `<div class="ev"><time>${e.ts.slice(11, 16)}</time><div>${withWho ? `<span class="who" style="color:${TEAM_CSS[team]}">${e.agent}</span>` : ""}<span class="kind k-${e.kind}">${e.kind}</span><div class="txt"></div></div></div>`;

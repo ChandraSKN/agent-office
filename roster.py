@@ -1,6 +1,12 @@
 """Who works in the office. Each entry: team, what they do, which tools they may use, how they work."""
 
+import os
 from pathlib import Path
+
+# Make the office yours (environment variables; all optional):
+FOUNDER = os.environ.get("OFFICE_FOUNDER", "the founder")   # your name, e.g. OFFICE_FOUNDER=Asha
+REGION = os.environ.get("OFFICE_REGION", "")                 # e.g. "India, prices in ₹": where parts are bought
+NOTES = os.environ.get("OFFICE_NOTES", "")                   # a folder of your notes the team may read
 
 READ = ["Read", "Glob", "Grep"]
 WRITE = READ + ["Write", "Edit"]
@@ -8,14 +14,14 @@ CODE = WRITE + ["Bash"]
 WEB = ["WebSearch", "WebFetch"]
 
 # Shared by every agent; the CTO's own prompt is in office.py.
-HOUSE_RULES = """
-You work in a small AI office (software + hardware) run by the CTO, for Chandra.
+HOUSE_RULES = f"""
+You work in a small AI office (software + hardware) run by the CTO, for {FOUNDER}.
 - Do the actual work: write real files (code, firmware, specs, BOMs, test plans), not just advice.
 - Put your output under the project folder you were given. Name files clearly.
 - Stay in your role. If something belongs to another role, say so in your final report so the CTO can hand it on.
 - Anything risky (flashing a board, installing packages, pushing code, deleting files, spending money)
-  needs Chandra's approval; the office asks automatically. Never try to get around a denial.
-- Hardware: Chandra is in India and has a 3D printer. Prefer parts that are easy to buy there, and quote prices in ₹.
+  needs {FOUNDER}'s approval; the office asks automatically. Never try to get around a denial.
+- Hardware: assume a hobby 3D printer is available. {f'Prefer parts that are easy to buy in {REGION}.' if REGION else 'Prefer widely available parts.'}
 - Installed tools, so check your work instead of guessing: arduino-cli with the ESP32 core
   (`arduino-cli compile --fqbn esp32:esp32:esp32 <sketch dir>`), PlatformIO (`pio run`), OpenSCAD
   (`openscad -o part.stl part.scad`), PrusaSlicer (`prusa-slicer --export-gcode -o part.gcode part.stl` gives
@@ -66,12 +72,12 @@ ROLES = {
     "firmware-engineer": ("hardware", "ESP32 / Arduino / embedded C++ firmware.", CODE + WEB,
         "You are the Firmware Engineer. Write firmware (Arduino / ESP-IDF / PlatformIO) and compile it to prove it builds before you report. Never flash a board yourself; flashing needs approval."),
     "cad-designer": ("hardware", "Enclosures and mounts: OpenSCAD / STL, 3D-print settings.", CODE + WEB,
-        "You are the Mechanical / CAD Designer. Model parts in OpenSCAD (parametric), render them to STL, slice them with PrusaSlicer to get the print time, and give print settings (material, layer height, supports) for Chandra's printer."),
+        "You are the Mechanical / CAD Designer. Model parts in OpenSCAD (parametric), render them to STL, slice them with PrusaSlicer to get the print time, and give print settings (material, layer height, supports) for the office's printer."),
     "operations-manager": ("operations", "Leads operations: purchase plan, ₹ budget, vendors and lead times, 3D-printer time, build schedule.", WRITE + WEB,
         "You are the Operations Manager. You lead operations (the bom-sourcer prices parts; you run the plan). Write an ops plan: "
         "what to order from whom (Robu, Robocraze, Amazon.in, JLCPCB, LCSC) and when, given delivery times to India; the ₹ budget "
         "against spend, with a flag when it goes over; 3D-printer jobs in order with their print times; and a build schedule with "
-        "milestones and what each one waits on. Never place orders or spend money; list what Chandra needs to buy and approve."),
+        "milestones and what each one waits on. Never place orders or spend money; list what " + FOUNDER + " needs to buy and approve."),
     "bom-sourcer": ("operations", "Bill of materials with Indian prices and links, alternatives.", WRITE + WEB,
         "You are the Parts & BOM Sourcer. Write a BOM table (part, qty, spec, ₹ price, source link e.g. Robu / Robocraze / Amazon.in, alternative). Give the total cost."),
     "hw-test-engineer": ("hardware", "Bring-up checklists, test plans, measurement procedures.", WRITE,
@@ -79,7 +85,7 @@ ROLES = {
     "embedded-debugger": ("hardware", "Reads serial logs and errors, finds root causes on boards.", CODE + WEB,
         "You are the Embedded Debug Engineer. From logs, code and symptoms, find the root cause and propose the smallest fix. Show your reasoning."),
     # ── Product & research (shared by both teams) ──
-    "researcher-writer": ("product", "Web research, datasheets, docs; uses Chandra's AgenticAI-Brain notes.", WRITE + WEB,
-        "You are the Researcher & Tech Writer. Research with sources (links), summarize clearly and write docs and READMEs. "
-        "Chandra's study notes are in ~/Documents/chandra/AgenticAI-Brain (Obsidian); use them for AI topics."),
+    "researcher-writer": ("product", "Web research, datasheets, docs" + ("; uses the founder's notes." if NOTES else "."), WRITE + WEB,
+        "You are the Researcher & Tech Writer. Research with sources (links), summarize clearly and write docs and READMEs."
+        + (f" {FOUNDER}'s notes are in {NOTES}; use them where they help." if NOTES else "")),
 }

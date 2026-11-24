@@ -2,8 +2,10 @@
 # Run a hardware tool on the laptop from the Pi, in the current project folder:
 #   laptop openscad -o case.stl case.scad     laptop open case.stl
 # Copies this folder to the same place under the laptop's home first; outputs stay on the laptop.
-# The laptop only accepts what bin/laptop-gate allows. LAPTOP=user@host overrides the address.
-LAPTOP=${LAPTOP:-tst-017-lenovo@192.168.1.16}
+# The laptop only accepts what bin/laptop-gate allows.
+# Set its address with LAPTOP=user@host, or put user@host in ~/.config/agent-office/laptop.
+LAPTOP=${LAPTOP:-$(cat "$HOME/.config/agent-office/laptop" 2>/dev/null)}
+[ -n "$LAPTOP" ] || { echo "laptop: set LAPTOP=user@host or write it to ~/.config/agent-office/laptop" >&2; exit 2; }
 KEY="$HOME/.ssh/laptop_ed25519"
 rel=$(realpath --relative-to="$HOME" "$PWD")
 case $rel in ..*) echo "laptop: run it from inside your home folder" >&2; exit 2 ;; esac

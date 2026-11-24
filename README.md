@@ -11,7 +11,7 @@ uv run office.py          # then open http://localhost:8765
 
 On first open, a popup asks for your **Claude API key** ([get one](https://console.anthropic.com/settings/keys)). It is sent only to your local server and kept in memory, never written to disk; tick "Remember" to keep it in your browser. Change it any time with **🔑 Key**. You can also set `ANTHROPIC_API_KEY` in the environment, or skip the popup to use an existing Claude Code login. Requires Python 3.13+, [uv](https://docs.astral.sh/uv/) and Node (for the Claude Code CLI the agent SDK runs).
 
-Chandra's AI office: a **CTO** that plans goals and hands the work to 19 specialists: a software team, a hardware lab, product & research, and operations (an Operations Manager and a parts sourcer). Buddy is the CEO. They do real work (code, firmware, BOMs, CAD, test plans) in a project folder.
+An AI office: a **CTO** that plans goals and hands the work to 19 specialists: a software team, a hardware lab, product & research, and operations (an Operations Manager and a parts sourcer). Buddy is the CEO. They do real work (code, firmware, BOMs, CAD, test plans) in a project folder.
 
 ```bash
 uv run office.py                                           # then open http://localhost:8765
@@ -24,6 +24,8 @@ uv run office.py "..." --once                              # one goal, then exit
 - **Graphics switch (🎨 Normal | ✨ Realistic):** Realistic mode swaps the figures for rigged, animated 3D people (three.js's open-source Mixamo "Xbot", dressed by team: coloured shirts, suits and ties for the CTO and CEO) at standing desks. They idle, nod while working and walk. Open `http://localhost:8765/?real` to jump straight in.
 - **▶ Story / ■ Exit story:** a scripted demo sprint with captions, for videos; click again to return to the live office.
 - **Realistic graphics details:** top-bar toggle adding reflections, ambient occlusion, bloom and 8K soft shadows. Minimum 4-core CPU, 8 GB RAM, Intel Iris Xe / Apple M1 (2 GB VRAM); recommended 6+ cores, 16 GB, GTX 1660 / RX 6600 / Apple M2 (4 GB+ VRAM). The popup shows your own device specs before you switch.
+- **Make it yours** (optional environment variables): `OFFICE_FOUNDER` (your name, used in the agents' instructions; default "the founder"), `OFFICE_REGION` (where you buy parts, e.g. `"India, prices in ₹"`), `OFFICE_NOTES` (a folder of notes the team may read). Example: `OFFICE_FOUNDER=Asha OFFICE_REGION="Germany, prices in €" uv run office.py`
+- **Remote hardware tools (optional):** `bin/laptop` runs CAD/firmware tools on another machine over SSH; set `LAPTOP=user@host` or write it to `~/.config/agent-office/laptop`.
 - **Roster:** `roster.py` (edit a role's tools or instructions there)
 - **Live log:** printed in the terminal + `state/events.jsonl` (GOAL / SEND / START / STEP / ASK / APPROVE / DENY / DONE)
 - **Desk status:** `state/board.json`, one entry per agent (idle / working / waiting, current task, tasks done)
