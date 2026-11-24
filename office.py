@@ -12,6 +12,7 @@ import argparse
 import asyncio
 import contextlib
 import json
+import os
 import re
 import sys
 import threading
@@ -37,8 +38,11 @@ PORT = 8765
 SAFE_BASH = re.compile(r"^\s*(ls|cat|head|tail|wc|pwd|echo|grep|rg|find|tree|file|which|"
                        r"git (status|diff|log|show)|python3? -m (pytest|py_compile)|pytest|uv run pytest|"
                        # hardware tools that only check designs or write files (flashing is not here)
-                       r"pio (check|run)(?!.*(-t|--target)\s*\w*upload)|arduino-cli compile|openscad|ngspice -b|"
-                       r"kicad-cli (sch|pcb) (export|erc|drc)|prusa-slicer (--export-gcode|-g|--info))\b")
+                       # (the same, or `laptop open <file>`, run on the laptop through bin/laptop)
+                       r"(laptop )?(pio (check|run)(?!.*(-t|--target)\s*\w*upload)|arduino-cli compile|openscad|"
+                       r"ngspice -b|kicad-cli (sch|pcb) (export|erc|drc)|prusa-slicer (--export-gcode|-g|--info))|"
+                       r"laptop open)\b")
+API_KEY = re.compile(r"sk-ant-[\w-]{20,200}")  # shape of a Claude API key
 CHAIN = re.compile(r"[;&|`$><]|\brm\b")  # chaining, redirects or rm make a "safe" command unsafe
 
 
@@ -84,6 +88,7 @@ class Office:
         self.can_ask = can_ask  # False in --once runs without a terminal: deny instead of waiting
         STATE.mkdir(exist_ok=True)
         self.events = STATE / "events.jsonl"
+        self.said, self.said_until = "", 0.0   # what Buddy is saying right now (POST /api/say)
         self.board_path = STATE / "board.json"
         try:
             self.board = json.loads(self.board_path.read_text())
@@ -100,6 +105,8 @@ class Office:
         self.asking = None  # {"agent","tool","what"} while an approval is open
         self.answer = None  # future the open approval waits on
         self.loop = asyncio.get_running_loop()
+        self.api_key = os.environ.get("ANTHROPIC_API_KEY", "")  # or set from the browser's first-run popup
+        self.key_changed = False  # a new key starts a fresh manager session on the next goal
         self.save_board()
 
     # ── state files ──
@@ -123,8 +130,10 @@ class Office:
         return any(v["status"] != "idle" for k, v in self.board.items() if k not in (MANAGER, CEO))
 
     def snapshot(self):  # called from the web thread; copies are cheap at this size
+        said = self.said if time.monotonic() < self.said_until else ""
         return {"board": self.board, "events": list(self.recent), "asking": self.asking,
-                "queued": self.goals.qsize(), "project": str(self.project)}
+                "queued": self.goals.qsize(), "project": str(self.project), "buddy_says": said,
+                "has_key": bool(self.api_key)}
 
     @staticmethod
     def who(inp):
@@ -225,6 +234,9 @@ def start_web(office):
             super().do_GET()
 
         def do_POST(self):
+            origin = self.headers.get("Origin")
+            if origin and origin not in (f"http://localhost:{PORT}", f"http://127.0.0.1:{PORT}"):
+                return self.send_json({"error": "cross-site request"}, 403)  # other web pages can't drive the office
             size = int(self.headers.get("Content-Length") or 0)
             if self.path.startswith("/api/upload"):
                 return self.upload(size)
@@ -252,6 +264,16 @@ def start_web(office):
                              + "\n".join(f"- {f}" for f in files))
                 via = CEO if data.get("via") == CEO else None
                 office.loop.call_soon_threadsafe(office.goals.put_nowait, (text, who, project, via))
+                return self.send_json({"ok": True})
+            if self.path == "/api/say":  # Buddy's own words, shown on the CEO (his body on the Pi)
+                office.said = str(data.get("text", ""))[:300]
+                office.said_until = time.monotonic() + min(float(data.get("ms") or 3000), 30000) / 1000
+                return self.send_json({"ok": True})
+            if self.path == "/api/key":  # held in memory only, never written to disk
+                key = str(data.get("key", "")).strip()
+                if not API_KEY.fullmatch(key):
+                    return self.send_json({"error": "that doesn't look like a Claude API key (sk-ant-…)"}, 400)
+                office.api_key, office.key_changed = key, True
                 return self.send_json({"ok": True})
             if self.path == "/api/approve":
                 office.loop.call_soon_threadsafe(office.on_approve, bool(data.get("ok")))
@@ -335,7 +357,8 @@ async def run(goal, project, once):
         return ClaudeAgentOptions(
             max_buffer_size=50 * 1024 * 1024,  # ponytail: big PDF reads overflow the 1 MB default
             model=MODEL, cwd=str(folder), agents=agents, system_prompt=manager_prompt(folder),
-            add_dirs=[str(Path("~/Documents/chandra/AgenticAI-Brain").expanduser())],
+            add_dirs=[str(d) for d in [Path("~/Documents/chandra/AgenticAI-Brain").expanduser()] if d.is_dir()],
+            env={"ANTHROPIC_API_KEY": office.api_key} if office.api_key else {},
             can_use_tool=office.can_use_tool, setting_sources=[],
             hooks={"PreToolUse": [HookMatcher(hooks=[office.pre_tool])],
                    "SubagentStart": [HookMatcher(hooks=[office.subagent_start])],
@@ -352,10 +375,11 @@ async def run(goal, project, once):
             goal, who, folder, via = await office.goals.get()
             if goal in ("exit", "quit"):
                 return
-            if client is None or (folder and folder != office.project):
+            if client is None or office.key_changed or (folder and folder != office.project):
                 # a new project: a fresh manager session working in that folder
                 await stack.aclose()
                 office.project = folder or office.project
+                office.key_changed = False
                 client = await stack.enter_async_context(ClaudeSDKClient(options=options(office.project)))
             office.log(who, "GOAL", goal, project=office.project.name, **({"via": via} if via else {}))
             office.set(MANAGER, status="working", task=goal[:80])

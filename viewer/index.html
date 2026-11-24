@@ -5,85 +5,96 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent Office</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f6e7f0; --panel: rgba(255,255,255,.86); --ink: #3b2f45; --muted: #8a7d95; --line: rgba(59,47,69,.1);
+    --bg: #0e0c16; --panel: rgba(20,17,32,.72); --ink: #f3eefb; --muted: #a59cb8; --soft: #d3cbe2; --line: rgba(255,255,255,.08);
+    --chip: rgba(255,255,255,.07); --edge: rgba(255,255,255,.12); --claude: #d97757; --glow: 0 0 0 1px var(--edge), 0 12px 40px rgba(0,0,0,.45);
     --ceo: #c9971c; --cto: #9b6bdf; --software: #3aa6c9; --hardware: #f08a3c; --product: #e86aa6; --operations: #2fa37a;
     --ok: #3fb67a; --warn: #f2b632; --bad: #e5534b;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
-    font-family: Nunito, system-ui, sans-serif; }
+    font-family: 'Space Grotesk', Nunito, system-ui, sans-serif; }
   #scene { position: fixed; inset: 0; }
-  .panel { position: fixed; background: var(--panel); backdrop-filter: blur(10px); border-radius: 18px;
-    box-shadow: 0 6px 24px rgba(80,40,90,.12); }
+  .panel { position: fixed; background: var(--panel); backdrop-filter: blur(16px) saturate(140%); border-radius: 18px;
+    box-shadow: var(--glow); }
+  .panel::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background: linear-gradient(135deg, rgba(217,119,87,.14), transparent 40%, rgba(155,107,223,.12)); }
   /* top stats */
   #top { top: 12px; left: 12px; right: 12px; display: flex; gap: 8px; align-items: center; padding: 8px 12px; flex-wrap: wrap; }
-  #top h1 { font-size: 16px; margin: 0 8px 0 2px; font-weight: 800; white-space: nowrap; }
-  .stat { display: flex; align-items: baseline; gap: 5px; padding: 4px 10px; border-radius: 12px; background: rgba(255,255,255,.7); font-size: 13px; }
+  #top h1 { font-size: 17px; letter-spacing: -.01em; background: linear-gradient(90deg, #ffb48f, var(--claude), #b892ff);
+    -webkit-background-clip: text; background-clip: text; color: transparent; margin: 0 8px 0 2px; font-weight: 800; white-space: nowrap; }
+  .stat { display: flex; align-items: baseline; gap: 5px; padding: 4px 10px; border-radius: 12px; background: var(--chip); font-size: 13px; color: var(--muted); }
+  .stat b { color: var(--ink); }
   .stat b { font-size: 16px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; box-shadow: 0 0 10px currentColor; animation: pulse 2s infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
   #top .grow { flex: 1; }
-  .toggle { border: 0; border-radius: 12px; padding: 6px 11px; background: #fff; color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .toggle { border: 0; border-radius: 12px; padding: 6px 11px; background: var(--chip); color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
   .toggle[aria-pressed="false"] { opacity: .5; }
   #live { font-size: 12px; color: var(--muted); }
   /* log */
   #log { top: 72px; right: 12px; bottom: 84px; width: min(380px, calc(100vw - 24px)); display: flex; flex-direction: column; padding: 12px; }
   #log h2, #agent h2 { margin: 0 0 8px; font-size: 14px; font-weight: 800; }
   .filters { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
-  .filters button { border: 0; border-radius: 10px; padding: 3px 9px; font: inherit; font-size: 12px; background: #fff; cursor: pointer; color: var(--ink); }
-  .filters button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .filters button { border: 0; border-radius: 10px; padding: 3px 9px; font: inherit; font-size: 12px; background: var(--chip); cursor: pointer; color: var(--ink); }
+  .filters button[aria-pressed="true"] { background: var(--claude); color: #fff; }
   #events { overflow-y: auto; flex: 1; font-size: 12.5px; }
-  .ev { display: grid; grid-template-columns: 54px 1fr; gap: 6px; padding: 5px 2px; border-bottom: 1px solid var(--line); }
+  #ask input:focus { border-color: var(--claude); box-shadow: 0 0 0 3px rgba(217,119,87,.25); }
+  .ev { animation: slidein .35s ease-out; display: grid; grid-template-columns: 54px 1fr; gap: 6px; padding: 5px 2px; border-bottom: 1px solid var(--line); }
   .ev time { color: var(--muted); font-variant-numeric: tabular-nums; }
   .ev .who { font-weight: 800; }
-  .kind { font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 6px; margin-left: 4px; background: #eee; }
+  .kind { font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 6px; margin-left: 4px; background: #ddd; color: #241c30; letter-spacing: .04em; }
   .k-SEND { background: #e4dcfb; } .k-START { background: #d6f0fb; } .k-DONE { background: #d6f5e4; }
   .k-ASK { background: #fdeec7; } .k-DENY { background: #fbd9d7; } .k-APPROVE { background: #d6f5e4; }
   .k-GOAL { background: #fbd9ea; } .k-SAY { background: #ece6f5; }
-  .ev .txt { color: #5b4f66; white-space: pre-wrap; word-break: break-word; max-height: 9em; overflow: hidden; }
+  .ev .txt { color: var(--soft); white-space: pre-wrap; word-break: break-word; max-height: 9em; overflow: hidden; }
+  @keyframes slidein { from { opacity: 0; transform: translateX(12px); } }
+  #events::-webkit-scrollbar { width: 6px; } #events::-webkit-scrollbar-thumb { background: var(--edge); border-radius: 3px; }
   /* agent card */
   #agent { top: 72px; left: 12px; width: min(330px, calc(100vw - 24px)); max-height: calc(100vh - 168px); overflow-y: auto; padding: 14px; display: none; }
   #agent .role { font-size: 18px; font-weight: 800; }
   #agent .team { display: inline-block; color: #fff; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 8px; text-transform: uppercase; }
-  #agent p { margin: 8px 0; font-size: 13px; color: #5b4f66; }
+  #agent p { margin: 8px 0; font-size: 13px; color: var(--soft); }
   #agent .close { float: right; border: 0; background: none; font-size: 18px; cursor: pointer; color: var(--muted); }
   .kv { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin: 10px 0; }
-  .kv div { background: #fff; border-radius: 10px; padding: 6px; text-align: center; font-size: 11px; color: var(--muted); }
+  .kv div { background: var(--chip); border-radius: 10px; padding: 6px; text-align: center; font-size: 11px; color: var(--muted); }
   .kv b { display: block; font-size: 15px; color: var(--ink); }
   #agentEvents .ev { grid-template-columns: 1fr; }
   /* message bar */
   #ask { left: 12px; right: 12px; bottom: 12px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
   #ask .row { display: flex; gap: 8px; }
-  .attach { display: grid; place-items: center; width: 46px; border-radius: 12px; background: #fff; font-size: 20px; cursor: pointer; }
+  .attach { display: grid; place-items: center; width: 46px; border-radius: 12px; background: var(--chip); font-size: 20px; cursor: pointer; }
   #chips { display: flex; flex-wrap: wrap; gap: 6px; }
   #chips:empty { display: none; }
-  .chip { display: flex; align-items: center; gap: 6px; background: #fff; border-radius: 10px; padding: 4px 6px 4px 8px; font-size: 12.5px; max-width: 260px; }
+  .chip { display: flex; align-items: center; gap: 6px; background: var(--chip); border-radius: 10px; padding: 4px 6px 4px 8px; font-size: 12.5px; max-width: 260px; }
   .chip img { width: 28px; height: 28px; object-fit: cover; border-radius: 6px; }
   .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #ask .chip button { padding: 0 2px; border: 0; background: none; cursor: pointer; color: var(--muted); font-size: 14px; }
   #drop { position: fixed; inset: 0; display: none; place-items: center; background: rgba(155,107,223,.25);
     border: 4px dashed var(--cto); font-size: 22px; font-weight: 800; color: var(--ink); z-index: 10; pointer-events: none; }
   body.dragging #drop { display: grid; }
-  .k-FILE { background: #fff0c2; }
-  #ask input { flex: 1; border: 0; border-radius: 12px; padding: 12px 14px; font: inherit; font-size: 15px; background: #fff; color: var(--ink); min-width: 0; }
-  #ask button, .btn { border: 0; border-radius: 12px; padding: 0 18px; font: inherit; font-weight: 800; background: var(--cto); color: #fff; cursor: pointer; }
+  .k-FILE { background: var(--chip)0c2; }
+  #ask input { flex: 1; border: 1px solid var(--edge); outline: none; border-radius: 12px; padding: 12px 14px; font: inherit; font-size: 15px; background: var(--chip); color: var(--ink); min-width: 0; }
+  #ask button, .btn { border: 0; border-radius: 12px; padding: 0 18px; font: inherit; font-weight: 800; background: linear-gradient(135deg, var(--claude), #b65ad8); color: #fff; cursor: pointer;
+    box-shadow: 0 4px 18px rgba(217,119,87,.35); transition: transform .15s, filter .15s; }
+  #ask button:hover, .btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
   /* approval */
   #approval { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 24px)); padding: 18px; display: none; border: 3px solid var(--warn); z-index: 5; }
   #approval h2 { margin: 0 0 6px; font-size: 17px; }
-  #approval code { display: block; background: #fff; border-radius: 10px; padding: 10px; font-size: 13px; white-space: pre-wrap; word-break: break-all; margin: 10px 0 14px; }
+  #approval code { display: block; background: var(--chip); border-radius: 10px; padding: 10px; font-size: 13px; white-space: pre-wrap; word-break: break-all; margin: 10px 0 14px; }
   #approval .row { display: flex; gap: 8px; justify-content: flex-end; }
   #approval .row .btn { padding: 10px 18px; }
-  .deny { background: #fff !important; color: var(--bad) !important; border: 2px solid var(--bad) !important; }
+  .deny { background: var(--chip) !important; color: var(--bad) !important; border: 2px solid var(--bad) !important; }
   .approve { background: var(--ok) !important; }
   /* labels over the 3D scene */
   #labels { position: fixed; inset: 0; pointer-events: none; }
   .label { position: absolute; transform: translate(-50%, -100%); text-align: center; white-space: nowrap; }
-  .name { font-size: 11px; font-weight: 800; background: rgba(255,255,255,.9); padding: 2px 7px; border-radius: 8px; border-bottom: 3px solid; }
-  .bubble { display: block; margin: 0 auto 4px; max-width: 190px; white-space: normal; font-size: 11px; background: #fff; padding: 5px 8px; border-radius: 10px;
+  .name { font-size: 11px; font-weight: 700; color: var(--ink); background: rgba(20,17,32,.8); backdrop-filter: blur(6px); padding: 2px 7px; border-radius: 8px; border-bottom: 3px solid; }
+  .bubble { display: block; margin: 0 auto 4px; max-width: 190px; white-space: normal; font-size: 11px; background: #fff; color: #2b2238; padding: 5px 8px; border-radius: 10px;
     box-shadow: 0 2px 8px rgba(0,0,0,.12); line-height: 1.25; }
-  .bubble.waiting { background: #fff3cd; font-weight: 800; }
+  .bubble.waiting { background: var(--chip)3cd; font-weight: 800; }
   body.no-names .name, body.no-bubbles .bubble { display: none; }
   body.no-log #log { display: none; }
   #empty { position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%); font-size: 13px; color: var(--muted); }
@@ -96,13 +107,49 @@
   body.story #caption { display: block; }
   #caption small { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--cto); }
   #caption h2 { margin: 2px 0 4px; font-size: 26px; font-weight: 800; }
-  #caption p { margin: 0; font-size: 15px; color: #5b4f66; }
+  #caption p { margin: 0; font-size: 15px; color: var(--soft); }
   #caption .lesson { display: none; margin-top: 10px; padding: 8px 12px; border-radius: 10px; background: #e6f6ec; font-weight: 700; font-size: 14px; }
   #caption .lesson:not(:empty) { display: block; }
   #caption .lesson::before { content: "💡 Lesson: "; color: var(--ok); }
   #caption ul { margin: 6px 0 0; padding-left: 20px; font-size: 15px; line-height: 1.5; }
   .bubble.angry { background: #fbd9d7; font-weight: 800; }
   @media (max-width: 760px) { #log { top: auto; height: 34vh; bottom: 84px; } #agent { max-height: 40vh; } }
+  .seg { display: inline-flex; background: var(--chip); border-radius: 12px; padding: 3px; gap: 2px; }
+  .seg button { border: 0; border-radius: 9px; padding: 5px 10px; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .2s, color .2s; }
+  .seg button[aria-pressed="true"] { background: linear-gradient(135deg, var(--claude), #b65ad8); color: #fff; box-shadow: 0 2px 10px rgba(217,119,87,.35); }
+  /* realistic-mode popover */
+  #realPop { background: rgba(20,17,32,.94); top: 64px; right: 12px; width: min(420px, calc(100vw - 24px)); padding: 16px; z-index: 15; display: none; }
+  #realPop.open { display: block; animation: pop .3s ease-out; }
+  #realPop h3 { margin: 0 0 6px; font-size: 16px; }
+  #realPop p { margin: 6px 0; font-size: 13px; color: var(--soft); line-height: 1.45; }
+  #realPop table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 8px 0; }
+  #realPop th, #realPop td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  #realPop th { color: var(--muted); font-weight: 700; } #realPop td:first-child { font-weight: 700; }
+  #realYou { background: var(--chip); border-radius: 10px; padding: 8px 10px; }
+  #realPop .row { display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
+  #realPop .btn { padding: 10px 16px; }
+  #realPop .skip { border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
+  /* first-run: Claude API key */
+  #keyModal { position: fixed; inset: 0; z-index: 20; display: none; place-items: center; padding: 16px;
+    background: radial-gradient(circle at 30% 20%, rgba(217,119,87,.35), transparent 50%), radial-gradient(circle at 75% 80%, rgba(155,107,223,.35), transparent 50%), rgba(8,6,14,.78);
+    backdrop-filter: blur(6px); }
+  #keyModal.open { display: grid; }
+  #keyModal form { position: relative; width: min(440px, 100%); padding: 28px; border-radius: 22px; background: var(--panel); box-shadow: var(--glow);
+    display: flex; flex-direction: column; gap: 12px; animation: pop .4s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes pop { from { opacity: 0; transform: scale(.92) translateY(10px); } }
+  #keyModal .spark { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; font-size: 28px; color: #fff;
+    background: linear-gradient(135deg, var(--claude), #b65ad8); box-shadow: 0 8px 30px rgba(217,119,87,.5); }
+  #keyModal h2 { margin: 4px 0 0; font-size: 22px; }
+  #keyModal p { margin: 0; font-size: 14px; color: var(--soft); line-height: 1.5; }
+  #keyModal a { color: #ffb48f; }
+  #keyModal input[type=password] { border: 1px solid var(--edge); border-radius: 12px; padding: 13px 14px; font: inherit; font-size: 14px;
+    background: var(--chip); color: var(--ink); outline: none; }
+  #keyModal input[type=password]:focus { border-color: var(--claude); box-shadow: 0 0 0 3px rgba(217,119,87,.25); }
+  #keyModal label { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  #keyModal .row { display: flex; gap: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+  #keyModal .btn { padding: 12px 20px; }
+  #keyModal .skip { border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; }
+  #keyErr { color: var(--bad); font-size: 13px; min-height: 1em; }
 </style>
 </head>
 <body>
@@ -110,7 +157,7 @@
 <div id="labels"></div>
 
 <div id="top" class="panel">
-  <h1>🏢 Agent Office</h1>
+  <h1>✳︎ Agent Office</h1>
   <span class="stat"><b id="sAgents">19</b> agents</span>
   <span class="stat"><span class="dot" style="background:var(--ok)"></span><b id="sWorking">0</b> working</span>
   <span class="stat"><span class="dot" style="background:var(--warn)"></span><b id="sWaiting">0</b> waiting</span>
@@ -118,7 +165,9 @@
   <span class="stat"><b id="sQueued">0</b> queued</span>
   <span class="grow"></span>
   <span id="live">connecting…</span>
-  <a class="toggle" href="?story" style="text-decoration:none">▶ Story</a>
+  <a class="toggle" id="storyBtn" href="?story" style="text-decoration:none">▶ Story</a>
+  <span class="seg" role="group" aria-label="Graphics"><button id="normBtn" aria-pressed="true">🎨 Normal</button><button id="realBtn" aria-pressed="false">✨ Realistic</button></span>
+  <button class="toggle" id="keyBtn" title="Claude API key">🔑 Key</button>
   <button class="toggle" data-cls="no-names" aria-pressed="true">Names</button>
   <button class="toggle" data-cls="no-bubbles" aria-pressed="true">Bubbles</button>
   <button class="toggle" data-cls="no-log" aria-pressed="true">Log</button>
@@ -167,6 +216,34 @@
   <div class="row"><button class="btn deny" id="apNo">Deny</button><button class="btn approve" id="apYes">Approve</button></div>
 </div>
 <div id="empty"></div>
+<div id="realPop" class="panel" role="dialog" aria-labelledby="realTitle">
+  <h3 id="realTitle">✨ Realistic graphics</h3>
+  <p>Reflections, ambient occlusion, bloom and high-resolution soft shadows. Turn it on only if your machine has enough power:</p>
+  <table>
+    <tr><th></th><th>Minimum</th><th>Recommended</th></tr>
+    <tr><td>CPU</td><td>4 cores</td><td>6+ cores</td></tr>
+    <tr><td>RAM</td><td>8 GB</td><td>16 GB</td></tr>
+    <tr><td>GPU</td><td>Intel Iris Xe / Apple M1, 2 GB VRAM</td><td>GTX 1660 / RX 6600 / Apple M2 or better, 4 GB+ VRAM</td></tr>
+  </table>
+  <p id="realYou"></p>
+  <div class="row"><button type="button" class="skip" id="realCancel">Cancel</button><button type="button" class="btn" id="realGo"></button></div>
+</div>
+<div id="keyModal" role="dialog" aria-modal="true" aria-labelledby="keyTitle">
+  <form id="keyForm">
+    <div class="spark">✳︎</div>
+    <h2 id="keyTitle">Give your office a brain</h2>
+    <p>Agent Office runs on Claude. Paste your Claude API key and the CTO and all 19 specialists will think and work with it.
+      Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</p>
+    <input type="password" id="keyInput" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" aria-label="Claude API key" required>
+    <label><input type="checkbox" id="keyRemember"> Remember on this browser</label>
+    <div id="keyErr" role="alert"></div>
+    <div class="row"><button type="button" class="skip" id="keySkip">Use my Claude Code login instead</button>
+      <button type="submit" class="btn">Start the office →</button></div>
+    <p style="font-size:12px;color:var(--muted)">The key goes only to your local office server and is kept in memory, never written to disk.
+      Usage is billed to your Anthropic account.</p>
+  </form>
+</div>
+
 <div id="caption" class="panel"><small id="capTag"></small><h2 id="capTitle"></h2><p id="capText"></p><div class="lesson" id="capLesson"></div></div>
 
 <script type="importmap">
@@ -178,15 +255,30 @@
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
 const TEAM = { ceo: 0xd4a72c, cto: 0x9b6bdf, software: 0x3aa6c9, hardware: 0xf08a3c, product: 0xe86aa6, operations: 0x2fa37a };
 const TEAM_CSS = Object.fromEntries(Object.keys(TEAM).map(t => [t, `var(--${t})`]));
 const $ = (id) => document.getElementById(id);
 
 // ── scene: an office building on a campus, seen from above with the roof off ──
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
+// ?fps=15 = the always-on view on the Pi: capped frame rate, no shadows, no antialiasing, no blur
+const MAX_FPS = +new URLSearchParams(location.search).get("fps") || 0;
+// Realistic mode (top-bar toggle): reflections, ambient occlusion, bloom, sharper shadows. Needs a decent GPU.
+let REAL = new URLSearchParams(location.search).has("real"); try { REAL ||= localStorage.getItem("realistic") === "1"; } catch {}
+REAL &&= !MAX_FPS;
+const renderer = new THREE.WebGLRenderer({ antialias: !MAX_FPS });
+renderer.setPixelRatio(MAX_FPS ? 1 : REAL ? devicePixelRatio : Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = !MAX_FPS;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
 $("scene").appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 400);
@@ -211,6 +303,19 @@ scene.add(sun);
 
 const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: .8, ...o });
 const glass = new THREE.MeshStandardMaterial({ color: 0xbfe3f2, transparent: true, opacity: .22, roughness: .1, metalness: .2 });
+let composer = null;
+if (REAL) {
+  scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04).texture;  // soft reflections everywhere
+  scene.environmentIntensity = NIGHT ? .1 : .25; renderer.toneMappingExposure = .85;
+  hemi.intensity *= .4; sun.intensity *= 1.3;  // the environment now carries part of the fill light
+  sun.shadow.mapSize.set(8192, 8192); sun.shadow.radius = 4; sun.shadow.bias = -.0004; sun.shadow.normalBias = .02;
+  glass.roughness = .02; glass.metalness = .6; glass.opacity = .3;
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  const ao = new GTAOPass(scene, camera, innerWidth, innerHeight); ao.blendIntensity = .9; composer.addPass(ao);
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), NIGHT ? .7 : .35, .4, 1.0));  // glowing screens and lamps
+  composer.addPass(new OutputPass());
+}
 const box = (w, h, d, m, x, y, z, parent = scene) => {
   const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), typeof m === "number" ? mat(m) : m);
   b.position.set(x, y, z); b.castShadow = b.receiveShadow = true; parent.add(b); return b;
@@ -417,8 +522,8 @@ function buildAgent(name, p, i) {
     if (isBoss) box(.5, .3, .02, 0xffffff, .9, 1.25, -.7, g);   // papers
   }
   // chair
-  box(.8, .1, .8, 0x2d2f36, 0, .62, .15, g); box(.8, .9, .1, 0x2d2f36, 0, 1.1, .55, g);
-  box(.1, .55, .1, 0x555555, 0, .32, .15, g);
+  const chair = [box(.8, .1, .8, 0x2d2f36, 0, .62, .15, g), box(.8, .9, .1, 0x2d2f36, 0, 1.1, .55, g),
+                 box(.1, .55, .1, 0x555555, 0, .32, .15, g)];
   const body = isCEO ? buddyPerson() : person(color, i); body.position.set(0, 0, .1); g.add(body);
   if (isCEO) {   // nameplate on the desk
     const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.4, .35), new THREE.MeshBasicMaterial({ map: signTexture("CEO · BUDDY", "#2a1d12", "#e8c252", 512, 128) }));
@@ -435,7 +540,7 @@ function buildAgent(name, p, i) {
   el.className = "label";
   el.innerHTML = `<span class="bubble"></span><span class="name" style="border-color:${TEAM_CSS[team]}">${team === "ceo" ? "👔 Buddy · CEO" : team === "cto" ? "🧭 CTO" : name.endsWith("-architect") ? "★ " + name.replace("-architect", " lead") : name === "operations-manager" ? "★ operations manager" : name}</span><span class="mood"><i></i></span>`;
   $("labels").appendChild(el);
-  agents[name] = { g, body, ring, screen, el, bubble: el.querySelector(".bubble"), stressEl: el.querySelector(".mood i"), team, phase: rand() * 6 };
+  agents[name] = { g, body, chair, ring, screen, el, bubble: el.querySelector(".bubble"), stressEl: el.querySelector(".mood i"), team, phase: rand() * 6 };
 }
 
 // flying envelopes for hand-offs
@@ -455,6 +560,7 @@ async function poll() {
   try {
     const r = await fetch("/api/state"); const s = await r.json();
     board = s.board; events = s.events;
+    if (first) checkKey(s.has_key);
     $("live").textContent = "● live · " + s.project.split("/").slice(-2).join("/");
     $("live").style.color = "var(--ok)";
     update(s);
@@ -472,7 +578,7 @@ function update(s) {
   for (const [n, a] of Object.entries(agents)) {
     const b = board[n] || {};
     a.status = b.status;
-    const text = a.say ?? (n === "buddy" && ceoTrip ? ceoTrip.say
+    const text = a.say ?? (n === "buddy" && s.buddy_says ? "💬 " + s.buddy_says : n === "buddy" && ceoTrip ? ceoTrip.say
       : b.status === "waiting" ? "⚠️ needs your OK" : b.status === "working" ? (b.task || "working…") : "");
     a.bubble.classList.toggle("angry", !!a.angry);
     a.bubble.textContent = text; a.bubble.style.display = text ? "" : "none";
@@ -584,9 +690,49 @@ $("ask").onsubmit = async ev => {
   } catch (e) { alert("Couldn't send: " + e.message); }
   btn.disabled = false; btn.textContent = "Send";
 };
+// ── Claude API key: first-run popup ──
+let savedKey = ""; try { savedKey = localStorage.getItem("claudeKey") || ""; } catch {}
+const sendKey = k => fetch("/api/key", { method: "POST", body: JSON.stringify({ key: k }) });
+async function checkKey(has) {
+  if (has) return;
+  if (savedKey && (await sendKey(savedKey)).ok) return;   // remembered key, the office was restarted
+  let skipped = false; try { skipped = localStorage.getItem("keySkip"); } catch {}
+  if (!skipped) openKey();
+}
+function openKey() { $("keyModal").classList.add("open"); $("keyErr").textContent = ""; $("keyRemember").checked = !!savedKey; $("keyInput").focus(); }
+$("keyBtn").onclick = openKey;
+$("keySkip").onclick = () => { try { localStorage.setItem("keySkip", 1); } catch {} $("keyModal").classList.remove("open"); };
+$("keyForm").onsubmit = async ev => {
+  ev.preventDefault();
+  const k = $("keyInput").value.trim(), r = await sendKey(k);
+  if (!r.ok) { $("keyErr").textContent = (await r.json()).error; return; }
+  savedKey = $("keyRemember").checked ? k : "";
+  try { savedKey ? localStorage.setItem("claudeKey", k) : localStorage.removeItem("claudeKey"); } catch {}
+  $("keyInput").value = ""; $("keyModal").classList.remove("open");
+};
+// ── realistic graphics toggle: show requirements and this device's specs, then reload ──
+function deviceSpecs() {
+  const gl = document.createElement("canvas").getContext("webgl"), dbg = gl?.getExtension("WEBGL_debug_renderer_info");
+  const gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : "unknown";
+  const ram = navigator.deviceMemory ? `${navigator.deviceMemory}${navigator.deviceMemory >= 8 ? "+" : ""} GB` : "unknown";  // browsers cap this at 8
+  return `Your device: <b>${navigator.hardwareConcurrency || "?"} CPU threads</b> · <b>${ram} RAM</b> · GPU <b>${gpu.replace(/</g, "&lt;")}</b>`;
+}
+$("realBtn").setAttribute("aria-pressed", REAL); $("normBtn").setAttribute("aria-pressed", !REAL);
+$("normBtn").onclick = () => { if (REAL) $("realGo").onclick(); };   // back to normal: no checks needed
+$("realBtn").onclick = () => {
+  if (REAL) return;
+  $("realYou").innerHTML = deviceSpecs();
+  $("realGo").textContent = "Turn on realistic";
+  $("realPop").classList.toggle("open");
+};
+$("realCancel").onclick = () => $("realPop").classList.remove("open");
+$("realGo").onclick = () => {
+  try { localStorage.setItem("realistic", REAL ? "0" : "1"); } catch {}
+  const u = new URL(location); u.searchParams.delete("real"); location.href = u;   // ?real would otherwise force realistic again
+};
 const approve = ok => fetch("/api/approve", { method: "POST", body: JSON.stringify({ ok }) });
 $("apYes").onclick = () => approve(true); $("apNo").onclick = () => approve(false);
-document.querySelectorAll(".toggle").forEach(b => b.onclick = () => {
+document.querySelectorAll(".toggle[data-cls]").forEach(b => b.onclick = () => {
   const on = b.getAttribute("aria-pressed") !== "true";
   b.setAttribute("aria-pressed", on); document.body.classList.toggle(b.dataset.cls, !on);
   resize();
@@ -645,7 +791,7 @@ function stepTrip(dt) {
 
 // ── loop ──
 function resize() {
-  renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight;
+  renderer.setSize(innerWidth, innerHeight); composer?.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight;
   // centre the building in the space the log panel leaves free
   const off = document.body.classList.contains("no-log") || innerWidth < 760 ? 0 : $("log").offsetWidth / 2;
   camera.setViewOffset(innerWidth, innerHeight, off, 0, innerWidth, innerHeight);
@@ -653,7 +799,10 @@ function resize() {
 }
 addEventListener("resize", resize); resize();
 const clock = new THREE.Clock(), v = new THREE.Vector3();
+// animations use dt, so they keep their speed under the ?fps cap
+if (MAX_FPS) document.querySelectorAll(".panel").forEach(e => e.style.backdropFilter = "none");  // blur redraws every frame
 function frame() {
+  if (MAX_FPS && clock.getElapsedTime() - (frame.last ?? -1) < 1 / MAX_FPS) return requestAnimationFrame(frame);
   const t = clock.getElapsedTime(), dt = Math.min(t - (frame.last ?? t), .1); frame.last = t;
   stepTrip(dt);
   stepStory(dt);
@@ -662,8 +811,9 @@ function frame() {
     const working = a.status === "working", waiting = a.status === "waiting";
     const walking = (n === "buddy" && ceoTrip) || a.out;
     a.body.visible = !a.leave;
-    if (!walking) a.body.position.y = working ? Math.abs(Math.sin(t * 9 + a.phase)) * .05 : 0;          // typing
+    if (a.rig) { stepRig(a, walking, working, dt); } else {    if (!walking) a.body.position.y = working ? Math.abs(Math.sin(t * 9 + a.phase)) * .05 : 0;          // typing
     if (!walking) a.body.rotation.x = working ? -.12 + Math.sin(t * 2 + a.phase) * .03 : waiting ? Math.sin(t * 6) * .08 : .12;  // lean in / fidget / lean back
+    }
     a.ring.material.opacity = working ? .55 + Math.sin(t * 4) * .25 : waiting ? .9 : 0;
     a.ring.material.color.set(waiting ? 0xf2b632 : 0x3fb67a);
     a.screen.material.emissive.set(working ? (a.team === "hardware" ? 0x3dff7a : 0x5fd0ff) : NIGHT ? 0x1a2a3a : 0x000000);
@@ -676,12 +826,12 @@ function frame() {
     a.el.style.top = (-v.y * .5 + .5) * innerHeight + "px";
   }
   for (let i = flights.length - 1; i >= 0; i--) {
-    const f = flights[i]; f.t += 0.016 / 1.3;
+    const f = flights[i]; f.t += dt / 1.3;
     f.m.position.lerpVectors(f.a, f.b, Math.min(f.t, 1)); f.m.position.y += Math.sin(Math.min(f.t, 1) * Math.PI) * 3;
     f.m.rotation.y += .15;
     if (f.t >= 1) { scene.remove(f.m); flights.splice(i, 1); }
   }
-  renderer.render(scene, camera);
+  composer ? composer.render() : renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
 
@@ -935,9 +1085,73 @@ async function story() {
   window.storyDone = true;
 }
 
+// ── realistic mode: rigged, animated humans (three.js's open-source Mixamo "Xbot") at standing desks ──
+// ponytail: one model for everyone, tinted by team; swap in distinct characters if people want faces
+async function rigAgents() {
+  const gltf = await new GLTFLoader().loadAsync("https://cdn.jsdelivr.net/gh/mrdoob/three.js@r170/examples/models/gltf/Xbot.glb");
+  const clip = n => gltf.animations.find(c => c.name === n);
+  const nod = clip("agree").clone(); THREE.AnimationUtils.makeClipAdditive(nod);   // layered on idle while working
+  const size = new THREE.Box3().setFromObject(gltf.scene).getSize(new THREE.Vector3());
+  for (const [i, [n, a]] of Object.entries(agents).entries()) {
+    const m = SkeletonUtils.clone(gltf.scene), boss = a.team === "cto" || a.team === "ceo";
+    m.scale.setScalar((boss ? 2.05 : 1.95) / size.y / a.body.scale.x);
+    m.rotation.y = Math.PI; m.position.z = .1;       // faces the desk (-z)
+    m.traverse(o => {
+      if (!o.isMesh) return;
+      o.castShadow = o.receiveShadow = true; o.frustumCulled = false; o.userData.agent = n;
+      dress(o, a.team, i);
+    });
+    a.body.children.forEach(c => c.visible = false);  // hide the toy figure, keep its group for walking
+    a.body.userData.stand = []; a.body.add(m);
+    a.chair.forEach(c => c.visible = false);
+    a.g.children.forEach(c => { if (c !== a.body && c !== a.ring && !a.chair.includes(c)) { c.position.y += .3; if (c.scale.y && c.geometry?.parameters?.height > .9) c.scale.y = 1.3; } });  // standing desks
+    const mixer = new THREE.AnimationMixer(m), act = k => mixer.clipAction(clip(k));
+    const idle = act("idle"), walk = act("walk"), work = mixer.clipAction(nod);
+    idle.play(); walk.play().setEffectiveWeight(0); work.play().setEffectiveWeight(0);
+    mixer.setTime(a.phase * 3);                     // nobody moves in lockstep
+    a.rig = { m, mixer, idle, walk, work, w: 0, k: 0 };
+  }
+}
+// clothes painted onto the body as vertex colours, by region of the T-pose (y up, 1.8 tall, faces +z, hands at |x| > .68)
+const PANTS = [0x2b3040, 0x3a3f4a, 0x4a3b2e, 0x23262e], SHOES = 0x1a1a1d;
+function dress(o, team, i) {
+  const boss = team === "cto" || team === "ceo", c = new THREE.Color(), pos = o.geometry.attributes.position;
+  const shirt = new THREE.Color(TEAM[team]), jacket = new THREE.Color(team === "ceo" ? 0x1f2433 : 0x2a2440);
+  const tie = new THREE.Color(team === "ceo" ? 0xc9971c : 0x9b6bdf);
+  const col = new Float32Array(pos.count * 3);
+  for (let k = 0; k < pos.count; k++) {
+    const x = pos.getX(k), y = pos.getY(k), z = pos.getZ(k), ax = Math.abs(x);
+    if (y < .08) c.set(SHOES);
+    else if (ax > .68) c.set(SKIN[i % 4]);                                   // hands
+    else if (y < .93) c.set(boss ? jacket : PANTS[i % 4]);                   // trousers (suit trousers for bosses)
+    else if (y < .99 && ax < .3) c.set(0x222222);                            // belt
+    else if (y < 1.47 || ax > .12) {                                         // top half (arms reach above the neckline)
+      if (!boss) c.copy(shirt).multiplyScalar(ax > .52 ? .85 : 1);           // shirt, cuffs a shade darker
+      else if (z > .05 && ax < .035 && y > 1.1) c.copy(tie);                // tie
+      else if (z > .04 && y > 1.25 && ax < .015 + (y - 1.25) * .3) c.set(0xf4f4f4);  // white shirt in the jacket's V
+      else c.copy(jacket);
+    }
+    else if (y > 1.66 && (z < .07 || y > 1.74)) c.set(HAIR[i % 4]);          // hair, face left clear
+    else c.set(SKIN[i % 4]);
+    c.toArray(col, k * 3);
+  }
+  o.geometry = o.geometry.clone(); o.geometry.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  o.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .7, metalness: 0 });
+}
+function stepRig(a, walking, working, dt) {
+  const r = a.rig, ease = x => Math.min(1, dt * 4) * x;
+  r.w += ease((walking ? 1 : 0) - r.w); r.k += ease((working && !walking ? 1 : 0) - r.k);
+  r.walk.setEffectiveWeight(r.w); r.idle.setEffectiveWeight(1 - r.w); r.work.setEffectiveWeight(r.k);
+  r.m.position.y = walking ? 0 : .34;               // walking, the group itself is lifted to the floor (.35)
+  if (walking) a.body.position.y = .35;             // no bounce: the walk cycle has its own
+  r.mixer.update(dt);
+}
+
 roster = await (await fetch("/api/roster")).json();
 const pos = layout(Object.keys(roster));
 Object.keys(roster).forEach((n, i) => buildAgent(n, pos[n], i));
+if (REAL) rigAgents().catch(e => console.warn("realistic people not loaded, keeping the simple ones", e));
+if (STORY) Object.assign($("storyBtn"), { href: location.pathname, textContent: "■ Exit story" });
 STORY ? story() : poll(); frame();
 </script>
 </body>

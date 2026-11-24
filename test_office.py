@@ -8,10 +8,12 @@ P = Path("/tmp/proj")
 def test_approval_policy():
     safe = ["ls -la", "git diff", "python -m pytest -q", "pio run", "arduino-cli compile --fqbn esp32:esp32:esp32 .",
             "openscad -o case.stl case.scad", "ngspice -b divider.cir", "kicad-cli pcb export gerbers board.kicad_pcb",
-            "kicad-cli sch erc main.kicad_sch", "prusa-slicer --export-gcode -o case.gcode case.stl"]
+            "kicad-cli sch erc main.kicad_sch", "prusa-slicer --export-gcode -o case.gcode case.stl",
+            "laptop openscad -o case.stl case.scad", "laptop open case.stl"]
     risky = ["rm -rf build", "pio run -t upload", "git push", "pip install x", "ls; rm x",
              "cat a > b", "curl -X POST http://x", "esptool.py write_flash 0x0 fw.bin",
-             "pio run --target upload", "arduino-cli upload -p /dev/ttyUSB0", "prusa-slicer case.stl"]
+             "pio run --target upload", "arduino-cli upload -p /dev/ttyUSB0", "prusa-slicer case.stl",
+             "laptop pio run -t upload", "laptop rm x", "laptop openscad a.scad; rm b", "laptop esptool.py"]
     for c in safe:
         assert not needs_approval("Bash", {"command": c}, P), c
     for c in risky:
@@ -42,3 +44,9 @@ def test_upload_path(tmp_path):
     evil = upload_path(tmp_path, "../../../.bashrc.png")
     assert evil.parent.parent == tmp_path / "briefs"                                 # stays in briefs/
     assert upload_path(tmp_path, "run.sh") is None and upload_path(tmp_path, "x.exe") is None
+
+
+def test_api_key_shape():
+    from office import API_KEY
+    assert API_KEY.fullmatch("sk-ant-api03-" + "a1_B-" * 10)
+    assert not API_KEY.fullmatch("sk-ant-short") and not API_KEY.fullmatch("hello") and not API_KEY.fullmatch("sk-ant-" + "x" * 30 + " evil")

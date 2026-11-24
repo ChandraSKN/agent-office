@@ -1,0 +1,15 @@
+#!/bin/sh
+# Run a hardware tool on the laptop from the Pi, in the current project folder:
+#   laptop openscad -o case.stl case.scad     laptop open case.stl
+# Copies this folder to the same place under the laptop's home first; outputs stay on the laptop.
+# The laptop only accepts what bin/laptop-gate allows. LAPTOP=user@host overrides the address.
+LAPTOP=${LAPTOP:-tst-017-lenovo@192.168.1.16}
+KEY="$HOME/.ssh/laptop_ed25519"
+rel=$(realpath --relative-to="$HOME" "$PWD")
+case $rel in ..*) echo "laptop: run it from inside your home folder" >&2; exit 2 ;; esac
+opts="-i $KEY -o ConnectTimeout=5 -o BatchMode=yes"
+if ! rsync -a --mkpath --exclude .git -e "ssh $opts" ./ "$LAPTOP:$rel/" 2>/dev/null; then
+    echo "laptop: your laptop is off or asleep (can't reach $LAPTOP)" >&2
+    exit 3
+fi
+exec ssh $opts "$LAPTOP" "$(printf '%s' "$rel"; for a in "$@"; do printf " '%s'" "$(printf '%s' "$a" | sed "s/'/'\\\\''/g")"; done)"

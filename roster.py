@@ -1,5 +1,7 @@
 """Who works in the office. Each entry: team, what they do, which tools they may use, how they work."""
 
+from pathlib import Path
+
 READ = ["Read", "Glob", "Grep"]
 WRITE = READ + ["Write", "Edit"]
 CODE = WRITE + ["Bash"]
@@ -21,6 +23,13 @@ You work in a small AI office (software + hardware) run by the CTO, for Chandra.
   ngspice (`ngspice -b circuit.cir` to simulate). These run without asking; flashing a board always asks.
 - End with a short report: what you did, which files you made or changed, and what the next role should do.
 """
+
+# Trinnovate company knowledge, given to every agent (and the CTO) at startup.
+BRAIN = Path.home() / "trinnovate_claude_brain"
+if BRAIN.is_dir():
+    HOUSE_RULES += "\n# Trinnovate knowledge base\n" + "\n\n".join(
+        (BRAIN / f).read_text() for f in ("CLAUDE.md", "TRINNOVATE_MASTER_CONTEXT.md") if (BRAIN / f).exists())
+    HOUSE_RULES += f"\nProduct brochures and the company profile (PDFs) are in {BRAIN}; Read them when a task needs detail.\n"
 
 ROLES = {
     # ── Software team ──

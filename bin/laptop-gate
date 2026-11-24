@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""The only thing the Pi's key may run on this laptop (authorized_keys command=).
+
+The Pi sends either an rsync (copying a project folder in, kept inside $HOME by rrsync) or
+"<folder relative to home> <tool> <args...>". Only the hardware tools below and `open` run;
+paths may not leave the project folder. Uploading/flashing is not here: that stays on the
+office's approval path.
+"""
+import os
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+
+HOME = Path.home()
+TOOLS = {"openscad", "kicad-cli", "pio", "arduino-cli", "prusa-slicer", "ngspice", "open"}
+BLOCKED = {"upload", "-u", "--upload", "-t", "--target", "burn-bootloader"}  # flashing waits for approval
+DESKTOP = {"WAYLAND_DISPLAY": "wayland-0", "DISPLAY": ":0", "XDG_RUNTIME_DIR": f"/run/user/{os.getuid()}",
+           "DBUS_SESSION_BUS_ADDRESS": f"unix:path=/run/user/{os.getuid()}/bus"}
+
+
+def check(words):
+    """(folder, argv) to run, or raise ValueError saying why not."""
+    if len(words) < 2:
+        raise ValueError("usage: <folder> <tool> [args]")
+    folder = (HOME / words[0]).resolve()
+    tool, args = words[1], words[2:]
+    if not folder.is_relative_to(HOME) or not folder.is_dir():
+        raise ValueError(f"no such folder in home: {words[0]}")
+    if tool not in TOOLS:
+        raise ValueError(f"tool not allowed: {tool}")
+    for a in args:
+        # ponytail: path check is per argument; "--out=/etc/x" style flags are caught by the "/" test
+        if a in BLOCKED or "/" in a and (a.startswith("/") or "=/" in a) or ".." in a:
+            raise ValueError(f"argument not allowed: {a}")
+    argv = ["gio", "open", *args] if tool == "open" else [tool, *args]
+    return folder, argv
+
+
+def main():
+    cmd = os.environ.get("SSH_ORIGINAL_COMMAND", "")
+    if cmd.startswith("rsync --server"):
+        os.execv("/usr/bin/rrsync", ["rrsync", str(HOME)])
+    try:
+        folder, argv = check(shlex.split(cmd))
+    except ValueError as e:
+        print(f"laptop: {e}", file=sys.stderr)
+        return 2
+    env = {**os.environ, "PATH": f"{HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin", **DESKTOP}
+    return subprocess.run(argv, cwd=folder, env=env).returncode
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--test"]:
+        p = HOME / "Documents"
+        assert check(["Documents", "openscad", "-o", "case.stl", "case.scad"])[1][0] == "openscad"
+        assert check(["Documents", "open", "case.stl"])[1] == ["gio", "open", "case.stl"]
+        for bad in (["Documents", "rm", "x"], ["../..", "openscad"], ["Documents", "openscad", "-o", "/etc/x"],
+                    ["Documents", "pio", "run", "-t", "upload"], ["Documents", "openscad", "../x.scad"],
+                    ["Documents", "openscad", "--out=/tmp/x"]):
+            try:
+                check(bad)
+                raise SystemExit(f"should refuse: {bad}")
+            except ValueError:
+                pass
+        print("ok")
+    else:
+        sys.exit(main())
